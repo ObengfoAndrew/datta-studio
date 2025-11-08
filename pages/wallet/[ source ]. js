@@ -1,0 +1,65 @@
+// File: pages/wallet/[source].js
+import { useRouter } from 'next/router';
+import React, { useEffect, useState } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+
+export default function WalletFolder() {
+  const router = useRouter();
+  const { source } = router.query;
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const userId = 'demo-user'; // Replace with auth UID if using Firebase Auth
+
+  useEffect(() => {
+    if (!source) return;
+
+    const fetchFiles = async () => {
+      try {
+        const walletRef = collection(db, 'users', userId, 'wallet');
+        const snapshot = await getDocs(walletRef);
+        const matchingFiles = [];
+
+        snapshot.forEach(doc => {
+          if (doc.id.startsWith(source)) {
+            matchingFiles.push({ id: doc.id, data: doc.data() });
+          }
+        });
+
+        setFiles(matchingFiles);
+      } catch (error) {
+        console.error('Error fetching folder data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFiles();
+  }, [source]);
+
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-6">📁 {source} Files</h1>
+
+      {loading ? (
+        <p>Loading files...</p>
+      ) : files.length === 0 ? (
+        <p>No files found in this folder.</p>
+      ) : (
+        <ul className="space-y-4">
+          {files.map(file => (
+            <li
+              key={file.id}
+              className="bg-white shadow p-4 rounded border text-sm text-gray-700 whitespace-pre-wrap overflow-auto"
+            >
+              <strong>{file.id}.json</strong>
+              <pre className="mt-2 text-xs text-gray-600">
+                {JSON.stringify(file.data, null, 2)}
+              </pre>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
