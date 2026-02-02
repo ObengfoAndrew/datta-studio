@@ -8,6 +8,11 @@ const nextConfig = {
   // Disable Google Fonts optimization to avoid timeout issues
   optimizeFonts: false,
   
+  // Build-time optimization
+  productionBrowserSourceMaps: false,
+  compress: true,
+  poweredByHeader: false,
+  
   webpack: (config, { isServer }) => {
     if (!isServer) {
       const emptyModulePath = path.resolve(__dirname, 'empty-module.js');

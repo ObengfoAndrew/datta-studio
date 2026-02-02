@@ -65,13 +65,13 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
   // Fetch real-time data from Firestore
   useEffect(() => {
     const fetchRealTimeData = async () => {
-      if (!isAuthenticated || !currentUser) return;
+      if (!isAuthenticated || !currentUser || !db) return;
 
       try {
         const userId = currentUser.uid;
         
         // Fetch datasets and calculate total upload
-        const datasetsRef = collection(db, 'users', userId, 'datasets');
+        const datasetsRef = collection(db!, 'users', userId, 'datasets');
         const datasetsSnapshot = await getDocs(datasetsRef);
         let totalBytes = 0;
         let totalEarn = 0;
@@ -120,7 +120,7 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
         setCompaniesCount(companies.size.toString());
 
         // Fetch wallet folders
-        const walletRef = collection(db, 'users', userId, 'wallet');
+        const walletRef = collection(db!, 'users', userId, 'wallet');
         const walletSnapshot = await getDocs(walletRef);
         setFoldersCount(walletSnapshot.size.toString());
 
