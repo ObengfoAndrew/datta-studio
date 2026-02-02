@@ -12,45 +12,74 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
-    // Users collection - require authentication and ownership
+    // Top-level datasets collection - allow public read of published datasets
+    match /datasets/{datasetId} {
+      allow read: if resource.data.status == 'published' || resource.data.status == null;
+      allow write: if false; // Only allow through user collection
+    }
+    
+    // Users collection
     match /users/{userId} {
-      // Require auth and ownership (removed demo-user for production)
-      allow read, write: if isOwner(userId);
+      // AI Lab connections - allow public read (for discovery API)
+      match /aiLabConnections/{document=**} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
       
-      // Wallet subcollection
-      match /wallet/{walletId=**} {
+      // User datasets - PUBLIC READ for published datasets, owner can write
+      match /datasets/{datasetId} {
+        allow read: if resource.data.status == 'published'; // Allow public read of published datasets
+        allow write: if isOwner(userId); // Only owner can write
+      }
+      
+      // Access requests - owner only
+      match /accessRequests/{document=**} {
         allow read, write: if isOwner(userId);
       }
       
-      // Data Sources subcollection
-      match /dataSources/{sourceId=**} {
+      // API keys - owner only
+      match /apiKeys/{document=**} {
         allow read, write: if isOwner(userId);
       }
       
-      // Activities subcollection
-      match /activities/{activityId=**} {
+      // Wallet data - owner only
+      match /wallet/{document=**} {
         allow read, write: if isOwner(userId);
       }
       
-      // Legacy collections for backward compatibility
-      match /csv-files/{fileId=**} {
+      // Data sources - owner only
+      match /dataSources/{document=**} {
         allow read, write: if isOwner(userId);
       }
       
-      match /uploads/{uploadId=**} {
+      // Activities - owner only
+      match /activities/{document=**} {
         allow read, write: if isOwner(userId);
       }
+      
+      // Connections - owner only
+      match /connections/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Repositories - owner only
+      match /repositories/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User settings and other data - owner only
+      match /{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Allow user read/write their own user document
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
     }
     
     // Test collection for debugging (can be removed in production)
     match /test/{document=**} {
-      allow read, write: if true; // Beta: Allow all test access
-    }
-    
-    // Deny all other access
-    match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }
-

@@ -8,7 +8,10 @@ export async function GET() {
       version: "0.1.0",
       description: "Early access API for AI labs to list, discover, and request datasets."
     },
-    servers: [{ url: "http://localhost:3000" }],
+    servers: [
+      { url: "http://localhost:3000", description: "Development" },
+      { url: "https://your-domain.vercel.app", description: "Production" }
+    ],
     security: [{ ApiKeyAuth: [] }],
     paths: {
       "/api/pilot/datasets": {

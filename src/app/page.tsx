@@ -1,5 +1,6 @@
-import EnhancedDashboard from '@/components/EnhancedDashboard'
+
+import EnhancedDashboard from '@/components/dashboard/EnhancedDashboard';
 
 export default function Home() {
-  return <EnhancedDashboard />
+  return <EnhancedDashboard />;
 }

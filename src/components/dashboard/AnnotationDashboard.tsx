@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
-import { FileText, Image, Video, Tag, CheckCircle, Clock, AlertCircle, Plus, Upload, Users, TrendingUp, X, Github, Twitter, Linkedin, Mail, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FileText, Image, Video, Tag, CheckCircle, Clock, AlertCircle, Plus, Upload, Users, TrendingUp, X, Github, Twitter, Linkedin, Mail, ExternalLink, MessageCircle, Keyboard, Download, Share2, MoreVertical, Send, Zap, Flag } from 'lucide-react';
 
 interface AnnotationProject {
   id: number;
@@ -15,6 +15,25 @@ interface AnnotationProject {
   annotators: number;
 }
 
+interface AnnotationItem {
+  id: string;
+  content: string;
+  type: 'image' | 'text' | 'video';
+  labels: string[];
+  annotatedBy?: string;
+  timestamp?: string;
+  comment?: string;
+  quality?: number;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  avatar: string;
+  status: 'active' | 'idle' | 'offline';
+  currentItem?: string;
+}
+
 interface AnnotationDashboardProps {
   isDarkMode: boolean;
   onBack?: () => void;
@@ -23,6 +42,14 @@ interface AnnotationDashboardProps {
 const AnnotationDashboard: React.FC<AnnotationDashboardProps> = ({ isDarkMode, onBack }) => {
   const [showAddProject, setShowAddProject] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<AnnotationProject | null>(null);
+  const [currentItemIndex, setCurrentItemIndex] = useState(0);
+  const [showAnnotator, setShowAnnotator] = useState(false);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const [comment, setComment] = useState('');
+  const [showTeam, setShowTeam] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [qualityScore, setQualityScore] = useState(0);
 
   // Mobile responsiveness
   useEffect(() => {
@@ -31,6 +58,90 @@ const AnnotationDashboard: React.FC<AnnotationDashboardProps> = ({ isDarkMode, o
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if (e.key === '?') setShowShortcuts(!showShortcuts);
+      if (e.key === 'ArrowRight' && showAnnotator) moveToNext();
+      if (e.key === 'ArrowLeft' && showAnnotator) moveToPrev();
+      if (e.key === 's' && showAnnotator) submitAnnotation();
+      if (e.key === '1' && showAnnotator) toggleLabel('positive');
+      if (e.key === '2' && showAnnotator) toggleLabel('negative');
+      if (e.key === '3' && showAnnotator) toggleLabel('neutral');
+    };
+    
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [selectedLabels, showAnnotator, currentItemIndex]);
+
+  // Helper functions
+  const moveToNext = () => {
+    if (selectedProject && currentItemIndex < selectedProject.totalItems - 1) {
+      setCurrentItemIndex(currentItemIndex + 1);
+      setSelectedLabels([]);
+      setQualityScore(0);
+    }
+  };
+
+  const moveToPrev = () => {
+    if (currentItemIndex > 0) {
+      setCurrentItemIndex(currentItemIndex - 1);
+      setSelectedLabels([]);
+      setQualityScore(0);
+    }
+  };
+
+  const toggleLabel = (label: string) => {
+    setSelectedLabels(prev => 
+      prev.includes(label) 
+        ? prev.filter(l => l !== label)
+        : [...prev, label]
+    );
+  };
+
+  const submitAnnotation = () => {
+    if (selectedLabels.length > 0) {
+      // Quality score based on multiple labels and comments
+      const score = Math.min(100, (selectedLabels.length * 20) + (comment.length > 0 ? 20 : 0));
+      setQualityScore(score);
+      
+      // Simulate submission delay
+      setTimeout(() => {
+        moveToNext();
+        setComment('');
+      }, 500);
+    }
+  };
+
+  const generateAnnotationItems = (): AnnotationItem[] => {
+    const items: AnnotationItem[] = [];
+    for (let i = 0; i < 50; i++) {
+      items.push({
+        id: `item-${i}`,
+        content: `Sample ${selectedProject?.type} content #${i + 1}`,
+        type: (selectedProject?.type === 'image' ? 'image' : selectedProject?.type === 'video' ? 'video' : 'text') as 'image' | 'text' | 'video',
+        labels: []
+      });
+    }
+    return items;
+  };
+
+  const teamMembers: TeamMember[] = [
+    { id: '1', name: 'Sarah Chen', avatar: 'SC', status: 'active', currentItem: 'Product Image #45' },
+    { id: '2', name: 'Alex Kumar', avatar: 'AK', status: 'active', currentItem: 'Review #23' },
+    { id: '3', name: 'Jamie Lee', avatar: 'JL', status: 'idle', currentItem: undefined },
+    { id: '4', name: 'Marcus Brown', avatar: 'MB', status: 'offline', currentItem: undefined }
+  ];
+
+  const availableLabels = ['positive', 'negative', 'neutral', 'urgent', 'review-needed'];
+  const labelColors = {
+    positive: '#10b981',
+    negative: '#ef4444',
+    neutral: '#6b7280',
+    urgent: '#f59e0b',
+    'review-needed': '#a855f7'
+  };
 
   const annotationProjects: AnnotationProject[] = [
     {
@@ -126,6 +237,534 @@ const AnnotationDashboard: React.FC<AnnotationDashboardProps> = ({ isDarkMode, o
       default: return <Tag style={{ width: '20px', height: '20px' }} />;
     }
   };
+
+  // If project is selected, show annotation interface
+  if (showAnnotator && selectedProject) {
+    const items = generateAnnotationItems();
+    const currentItem = items[currentItemIndex];
+    const progress = ((currentItemIndex + 1) / selectedProject.totalItems) * 100;
+
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: currentTheme.bg,
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          backgroundColor: currentTheme.cardBg,
+          borderBottom: `1px solid ${currentTheme.borderLight}`,
+          padding: isMobile ? '16px' : '20px 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px'
+        }}>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontSize: '20px', fontWeight: '700', color: currentTheme.text, margin: '0 0 8px 0' }}>
+              {selectedProject.name}
+            </h2>
+            <div style={{
+              width: '100%',
+              backgroundColor: currentTheme.activityBg,
+              borderRadius: '4px',
+              height: '6px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                background: `linear-gradient(to right, ${progress < 50 ? '#3b82f6' : progress < 80 ? '#f59e0b' : '#10b981'}, ${progress < 50 ? '#60a5fa' : progress < 80 ? '#fbbf24' : '#34d399'})`,
+                height: '100%',
+                width: `${progress}%`,
+                transition: 'width 0.3s ease'
+              }}></div>
+            </div>
+            <div style={{ fontSize: '12px', color: currentTheme.textSecondary, marginTop: '6px' }}>
+              Item {currentItemIndex + 1} of {selectedProject.totalItems} ({progress.toFixed(1)}%)
+            </div>
+          </div>
+          <button
+            onClick={() => setShowAnnotator(false)}
+            style={{
+              backgroundColor: currentTheme.activityBg,
+              color: currentTheme.text,
+              border: `1px solid ${currentTheme.border}`,
+              padding: '8px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            ← Back
+          </button>
+        </div>
+
+        {/* Main Annotation Area */}
+        <div style={{
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: showTeam && !isMobile ? '1fr 280px' : '1fr',
+          gap: '20px',
+          padding: isMobile ? '16px' : '32px',
+          overflow: 'auto'
+        }}>
+          {/* Content Editor */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            {/* Content Display */}
+            <div style={{
+              backgroundColor: currentTheme.cardBg,
+              border: `2px solid ${currentTheme.borderLight}`,
+              borderRadius: '12px',
+              padding: '24px',
+              minHeight: '300px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              {selectedProject.type === 'image' ? (
+                <div style={{
+                  width: '100%',
+                  height: '300px',
+                  backgroundColor: currentTheme.activityBg,
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: currentTheme.textSecondary
+                }}>
+                  <Image style={{ width: '48px', height: '48px', opacity: 0.5 }} />
+                </div>
+              ) : selectedProject.type === 'video' ? (
+                <div style={{
+                  width: '100%',
+                  height: '300px',
+                  backgroundColor: currentTheme.activityBg,
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: currentTheme.textSecondary
+                }}>
+                  <Video style={{ width: '48px', height: '48px', opacity: 0.5 }} />
+                </div>
+              ) : (
+                <div style={{
+                  fontSize: '16px',
+                  color: currentTheme.text,
+                  lineHeight: '1.8',
+                  maxWidth: '600px',
+                  fontFamily: 'monospace',
+                  backgroundColor: currentTheme.activityBg,
+                  padding: '20px',
+                  borderRadius: '8px',
+                  maxHeight: '300px',
+                  overflow: 'auto'
+                }}>
+                  {currentItem.content}
+                </div>
+              )}
+            </div>
+
+            {/* Quality Indicator */}
+            {qualityScore > 0 && (
+              <div style={{
+                backgroundColor: currentTheme.cardBg,
+                border: `1px solid ${currentTheme.borderLight}`,
+                borderRadius: '12px',
+                padding: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <CheckCircle style={{ width: '20px', height: '20px', color: '#10b981' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '12px', color: currentTheme.textSecondary, marginBottom: '4px' }}>Quality Score</div>
+                  <div style={{ fontSize: '16px', fontWeight: '700', color: currentTheme.text }}>{qualityScore}%</div>
+                </div>
+                <div style={{
+                  width: '60px',
+                  height: '4px',
+                  backgroundColor: currentTheme.activityBg,
+                  borderRadius: '2px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    backgroundColor: qualityScore > 80 ? '#10b981' : qualityScore > 60 ? '#f59e0b' : '#ef4444',
+                    width: `${qualityScore}%`
+                  }}></div>
+                </div>
+              </div>
+            )}
+
+            {/* Labels */}
+            <div style={{
+              backgroundColor: currentTheme.cardBg,
+              border: `1px solid ${currentTheme.borderLight}`,
+              borderRadius: '12px',
+              padding: '20px'
+            }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: currentTheme.text, marginBottom: '16px', margin: '0 0 16px 0' }}>
+                Select Labels
+              </h3>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '8px',
+                marginBottom: '16px'
+              }}>
+                {availableLabels.map((label, idx) => (
+                  <button
+                    key={label}
+                    onClick={() => toggleLabel(label)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '20px',
+                      border: `2px solid ${selectedLabels.includes(label) ? labelColors[label as keyof typeof labelColors] : currentTheme.border}`,
+                      backgroundColor: selectedLabels.includes(label) 
+                        ? (labelColors[label as keyof typeof labelColors] + '20') 
+                        : currentTheme.activityBg,
+                      color: selectedLabels.includes(label) 
+                        ? labelColors[label as keyof typeof labelColors]
+                        : currentTheme.text,
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!selectedLabels.includes(label)) {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = labelColors[label as keyof typeof labelColors];
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!selectedLabels.includes(label)) {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = currentTheme.border;
+                      }
+                    }}
+                  >
+                    {label.replace('-', ' ')} {idx < 3 && <span style={{ fontSize: '11px', opacity: 0.6 }}>({idx + 1})</span>}
+                  </button>
+                ))}
+              </div>
+
+              {/* Comment */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: currentTheme.textSecondary, marginBottom: '8px' }}>
+                  Add a comment (optional)
+                </label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Notes about this annotation..."
+                  style={{
+                    width: '100%',
+                    backgroundColor: currentTheme.activityBg,
+                    border: `1px solid ${currentTheme.border}`,
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    color: currentTheme.text,
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                    minHeight: '60px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
+              gap: '8px'
+            }}>
+              <button
+                onClick={moveToPrev}
+                disabled={currentItemIndex === 0}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: currentItemIndex === 0 ? currentTheme.activityBg : currentTheme.cardBg,
+                  color: currentItemIndex === 0 ? currentTheme.textSecondary : currentTheme.text,
+                  border: `1px solid ${currentTheme.border}`,
+                  borderRadius: '8px',
+                  cursor: currentItemIndex === 0 ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (currentItemIndex > 0) {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = isDarkMode ? '#475569' : '#e2e8f0';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (currentItemIndex > 0) {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = currentTheme.cardBg;
+                  }
+                }}
+              >
+                ← Previous (←)
+              </button>
+
+              <button
+                onClick={() => setShowShortcuts(!showShortcuts)}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: currentTheme.activityBg,
+                  color: currentTheme.text,
+                  border: `1px solid ${currentTheme.border}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Keyboard style={{ width: '14px', height: '14px' }} />
+                Shortcuts (?)
+              </button>
+
+              <button
+                onClick={() => setShowTeam(!showTeam)}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: showTeam ? '#667eea' : currentTheme.activityBg,
+                  color: showTeam ? 'white' : currentTheme.text,
+                  border: `1px solid ${showTeam ? '#667eea' : currentTheme.border}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Users style={{ width: '14px', height: '14px' }} />
+                Team ({teamMembers.filter(m => m.status !== 'offline').length})
+              </button>
+
+              <button
+                onClick={submitAnnotation}
+                disabled={selectedLabels.length === 0}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: selectedLabels.length === 0 ? currentTheme.activityBg : '#10b981',
+                  color: selectedLabels.length === 0 ? currentTheme.textSecondary : 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: selectedLabels.length === 0 ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedLabels.length > 0) {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#059669';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedLabels.length > 0) {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#10b981';
+                  }
+                }}
+              >
+                Submit (S)
+              </button>
+
+              <button
+                onClick={moveToNext}
+                disabled={currentItemIndex >= selectedProject.totalItems - 1}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: currentItemIndex >= selectedProject.totalItems - 1 ? currentTheme.activityBg : currentTheme.cardBg,
+                  color: currentItemIndex >= selectedProject.totalItems - 1 ? currentTheme.textSecondary : currentTheme.text,
+                  border: `1px solid ${currentTheme.border}`,
+                  borderRadius: '8px',
+                  cursor: currentItemIndex >= selectedProject.totalItems - 1 ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s',
+                  gridColumn: isMobile ? '1' : '4'
+                }}
+                onMouseEnter={(e) => {
+                  if (currentItemIndex < selectedProject.totalItems - 1) {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = isDarkMode ? '#475569' : '#e2e8f0';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (currentItemIndex < selectedProject.totalItems - 1) {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = currentTheme.cardBg;
+                  }
+                }}
+              >
+                Next (→)
+              </button>
+            </div>
+          </div>
+
+          {/* Team Sidebar */}
+          {showTeam && !isMobile && (
+            <div style={{
+              backgroundColor: currentTheme.cardBg,
+              border: `1px solid ${currentTheme.borderLight}`,
+              borderRadius: '12px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              height: 'fit-content',
+              position: 'sticky',
+              top: '16px'
+            }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: currentTheme.text, margin: 0 }}>
+                Team Activity
+              </h3>
+              {teamMembers.map((member) => (
+                <div key={member.id} style={{
+                  display: 'flex',
+                  gap: '10px',
+                  alignItems: 'flex-start'
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    flexShrink: 0,
+                    position: 'relative'
+                  }}>
+                    {member.avatar}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: member.status === 'active' ? '#10b981' : member.status === 'idle' ? '#f59e0b' : '#6b7280',
+                      border: `2px solid ${currentTheme.cardBg}`
+                    }}></div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: currentTheme.text }}>
+                      {member.name}
+                    </div>
+                    {member.currentItem && (
+                      <div style={{ fontSize: '11px', color: currentTheme.textSecondary, marginTop: '2px' }}>
+                        {member.currentItem}
+                      </div>
+                    )}
+                    {!member.currentItem && (
+                      <div style={{ fontSize: '11px', color: currentTheme.textSecondary, marginTop: '2px' }}>
+                        {member.status === 'offline' ? 'Offline' : 'Idle'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Keyboard Shortcuts Modal */}
+        {showShortcuts && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50
+          }}>
+            <div style={{
+              backgroundColor: currentTheme.cardBg,
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '400px',
+              maxHeight: '80vh',
+              overflow: 'auto'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: currentTheme.text, margin: 0 }}>
+                  Keyboard Shortcuts
+                </h3>
+                <button
+                  onClick={() => setShowShortcuts(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: currentTheme.textSecondary,
+                    padding: '4px'
+                  }}
+                >
+                  <X style={{ width: '20px', height: '20px' }} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {[
+                  { key: '1', desc: 'Label: Positive' },
+                  { key: '2', desc: 'Label: Negative' },
+                  { key: '3', desc: 'Label: Neutral' },
+                  { key: '←', desc: 'Previous item' },
+                  { key: '→', desc: 'Next item' },
+                  { key: 'S', desc: 'Submit annotation' },
+                  { key: '?', desc: 'Show shortcuts' }
+                ].map((shortcut) => (
+                  <div key={shortcut.key} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 12px',
+                    backgroundColor: currentTheme.activityBg,
+                    borderRadius: '6px'
+                  }}>
+                    <span style={{ color: currentTheme.textSecondary, fontSize: '13px' }}>
+                      {shortcut.desc}
+                    </span>
+                    <kbd style={{
+                      backgroundColor: currentTheme.bg,
+                      border: `1px solid ${currentTheme.border}`,
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: currentTheme.text
+                    }}>
+                      {shortcut.key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{

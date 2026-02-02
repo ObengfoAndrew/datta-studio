@@ -1,0 +1,536 @@
+// src/components/dashboard/EnhancedDashboard.tsx
+
+'use client'
+
+import React, { useState, useEffect } from 'react';
+import { User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { getDatasets } from '@/lib/datasetService';
+import { getApiKeyEmail, getRejectionEmail } from '@/lib/emailService';
+import { DashboardHeader } from './DashboardHeader';
+import { DashboardSidebar } from './DashboardSidebar';
+import { DashboardContent } from './DashboardContent';
+import { DashboardFooter } from './DashboardFooter';
+import { HowToUsePage } from './HowToUsePage';
+import { DataWallet } from './DataWallet';
+import { AuthModals } from './AuthModals';
+import { AILabsModal } from './AILabsModal';
+import { ProfileModal } from './ProfileModal';
+import { AccessRequestsModal } from './AccessRequestsModal';
+import AddDataSourceModal from './AddDataSourceModal';
+import AnnotationDashboard from './AnnotationDashboard';
+import { getTheme } from '../shared/theme';
+import { Activity, Dataset, DataSource } from '../shared/types';
+import { SourceType, LicenseType, AccessRequest } from '@/lib/types';
+
+interface EnhancedDashboardState {
+  isAuthenticated: boolean;
+  currentUser: FirebaseUser | null;
+  isDarkMode: boolean;
+  activeView: 'dashboard' | 'annotations' | 'how-to-use';
+  showAuthModal: boolean;
+  showAILabsModal: boolean;
+  showProfileModal: boolean;
+  showDataWallet: boolean;
+  showAddSourceModal: boolean;
+  showAccessRequestsModal: boolean;
+  selectedWalletFolder: string | null;
+  isMobile: boolean;
+  dataSources: DataSource[];
+  recentActivity: Activity[];
+  datasets: Dataset[];
+  uploadedFiles: Array<{
+    name: string;
+    size: number;
+    type: string;
+    uploadDate: string;
+  }>;
+  walletFolders: string[];
+  accessRequests: AccessRequest[];
+}
+
+const EnhancedDashboard: React.FC = () => {
+  // ============ STATE MANAGEMENT ============
+  const [state, setState] = useState<EnhancedDashboardState>({
+    isAuthenticated: false,
+    currentUser: null,
+    isDarkMode: false,
+    activeView: 'dashboard',
+    showAuthModal: false,
+    showAILabsModal: false,
+    showProfileModal: false,
+    showDataWallet: false,
+    showAddSourceModal: false,
+    showAccessRequestsModal: false,
+    selectedWalletFolder: null,
+    isMobile: false,
+    dataSources: [],
+    recentActivity: [],
+    datasets: [],
+    uploadedFiles: [],
+    walletFolders: [],
+    accessRequests: []
+  });
+
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  const updateState = <K extends keyof EnhancedDashboardState>(
+    key: K,
+    value: EnhancedDashboardState[K]
+  ) => {
+    setState(prev => ({ ...prev, [key]: value }));
+  };
+
+  // ============ EFFECTS ============
+
+  // Check mobile responsiveness
+  useEffect(() => {
+    const checkMobile = () => updateState('isMobile', window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Firebase Auth State
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        updateState('currentUser', user);
+        updateState('isAuthenticated', true);
+        console.log('✅ User authenticated:', user.uid);
+      } else {
+        updateState('currentUser', null);
+        updateState('isAuthenticated', false);
+        updateState('showAuthModal', true);
+        console.log('👤 User signed out');
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch user datasets from Firestore (uploaded + GitHub/GitLab imports)
+  useEffect(() => {
+    if (state.currentUser?.uid) {
+      const fetchUserDatasets = async () => {
+        try {
+          console.log('📊 Fetching datasets for user:', state.currentUser?.uid);
+          const firestoreDatasets = await getDatasets(state.currentUser!.uid);
+          
+          if (firestoreDatasets.length > 0) {
+            console.log('✅ Loaded', firestoreDatasets.length, 'datasets from Firestore');
+            // Convert Firestore datasets to the shared Dataset type
+            const convertedDatasets = firestoreDatasets.map((ds: any) => ({
+              id: ds.id || ds.docId,
+              title: ds.sourceName || ds.title || 'Untitled Dataset',
+              sourceName: ds.sourceName,
+              sourceType: ds.sourceType,
+              licenseType: ds.licenseType,
+              status: ds.status,
+              downloads: ds.downloads || 0,
+              fileSize: ds.fileSize || 0,
+              dateAdded: ds.dateAdded,
+              metadata: ds.metadata || { description: '', tags: [] }
+            }));
+            // Set datasets from Firestore (no sample data)
+            updateState('datasets', convertedDatasets);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching datasets:', error);
+          // Keep empty datasets if fetch fails
+        }
+      };
+
+      fetchUserDatasets();
+    }
+  }, [state.currentUser?.uid]);
+
+  // Fetch access requests for the current user's datasets
+  useEffect(() => {
+    if (state.currentUser?.uid) {
+      const fetchAccessRequests = async () => {
+        try {
+          console.log('📬 Fetching access requests for user:', state.currentUser?.uid);
+          
+          // Get the user's access requests collection
+          const userAccessRequestsRef = collection(db, 'users', state.currentUser!.uid, 'accessRequests');
+          const accessRequestsSnapshot = await getDocs(userAccessRequestsRef);
+          
+          const requests: AccessRequest[] = [];
+          accessRequestsSnapshot.forEach(doc => {
+            const data = doc.data();
+            requests.push({
+              id: doc.id,
+              datasetName: data.datasetTitle || data.datasetName || 'Unknown Dataset',
+              aiLabName: data.requesterCompany || data.requesterName || 'Unknown Lab',
+              requesterEmail: data.requesterEmail || '',
+              purpose: data.purpose || '',
+              requestedAt: data.createdAt || new Date().toISOString(),
+              status: data.status || 'pending',
+              apiKey: data.apiKey,
+            });
+          });
+          
+          if (requests.length > 0) {
+            console.log('✅ Loaded', requests.length, 'access requests from Firestore');
+            updateState('accessRequests', requests);
+          } else {
+            console.log('📭 No access requests found');
+            updateState('accessRequests', []);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching access requests:', error);
+          updateState('accessRequests', []);
+        }
+      };
+
+      fetchAccessRequests();
+    }
+  }, [state.currentUser?.uid]);
+
+  const handleToggleTheme = () => {
+    updateState('isDarkMode', !state.isDarkMode);
+  };
+
+  const handleNavigate = (view: 'dashboard' | 'annotations' | 'how-to-use') => {
+    updateState('activeView', view);
+  };
+
+  const handleLogout = async () => {
+    try {
+      console.log('🚪 Signing out...');
+      await signOut(auth);
+      updateState('isAuthenticated', false);
+      updateState('currentUser', null);
+      updateState('showAuthModal', true);
+      alert('👋 You have been signed out.');
+    } catch (error: any) {
+      console.error('❌ Logout error:', error);
+      alert('Error logging out: ' + error.message);
+    }
+  };
+
+  const handleAddActivity = (action: string, type: string, icon: string) => {
+    const newActivity: Activity = {
+      action,
+      time: 'Just now',
+      type,
+      icon
+    };
+    setState(prev => ({
+      ...prev,
+      recentActivity: [newActivity, ...prev.recentActivity].slice(0, 10)
+    }));
+  };
+
+  // ============ RENDER ============
+
+  const theme = getTheme(state.isDarkMode);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        height: '100vh',
+        backgroundColor: theme.bg,
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        overflow: 'hidden',
+        transition: 'background-color 0.3s ease'
+      }}
+    >
+      {/* Sidebar */}
+      <DashboardSidebar
+        isDarkMode={state.isDarkMode}
+        activeView={state.activeView}
+        onNavigate={handleNavigate}
+        isMobile={state.isMobile}
+      />
+
+      {/* Main Content */}
+      <div style={{ flex: 1, overflow: 'auto', paddingBottom: '60px' }}>
+        {state.activeView === 'annotations' ? (
+          <AnnotationDashboard
+            isDarkMode={state.isDarkMode}
+            onBack={() => updateState('activeView', 'dashboard')}
+          />
+        ) : state.activeView === 'how-to-use' ? (
+          <HowToUsePage
+            isDarkMode={state.isDarkMode}
+            isMobile={state.isMobile}
+            onStartUpload={() => updateState('activeView', 'dashboard')}
+          />
+        ) : (
+          <>
+            {/* Header */}
+            <DashboardHeader
+              isDarkMode={state.isDarkMode}
+              onToggleTheme={handleToggleTheme}
+              isAuthenticated={state.isAuthenticated}
+              currentUser={state.currentUser}
+              onProfileClick={() => updateState('showProfileModal', true)}
+              onLogout={handleLogout}
+              onAILabsClick={() => updateState('showAILabsModal', true)}
+              onSignIn={() => updateState('showAuthModal', true)}
+              onAccessClick={() => updateState('showAccessRequestsModal', true)}
+              accessRequestCount={state.accessRequests.length}
+            />
+
+            {/* Dashboard Content */}
+            <DashboardContent
+              isDarkMode={state.isDarkMode}
+              isAuthenticated={state.isAuthenticated}
+              currentUser={state.currentUser}
+              dataSources={state.dataSources}
+              recentActivity={state.recentActivity}
+              onViewWallet={(folder?: string) => {
+                updateState('selectedWalletFolder', folder || null);
+                updateState('showDataWallet', true);
+              }}
+              onAddSource={() => {
+                updateState('showAddSourceModal', true);
+              }}
+              onAddActivity={handleAddActivity}
+              isMobile={state.isMobile}
+            />
+
+            {/* Footer */}
+            <DashboardFooter
+              isDarkMode={state.isDarkMode}
+              isMobile={state.isMobile}
+            />
+          </>
+        )}
+      </div>
+
+      {/* ============ MODALS ============ */}
+
+      {/* Auth Modals */}
+      <AuthModals
+        isOpen={state.showAuthModal}
+        isDarkMode={state.isDarkMode}
+        onClose={() => updateState('showAuthModal', false)}
+        onAuthSuccess={(user) => {
+          updateState('currentUser', user);
+          updateState('isAuthenticated', true);
+          updateState('showAuthModal', false);
+        }}
+      />
+
+      {/* AI Labs Modal */}
+      <AILabsModal
+        isOpen={state.showAILabsModal}
+        isDarkMode={state.isDarkMode}
+        onClose={() => updateState('showAILabsModal', false)}
+        isAuthenticated={state.isAuthenticated}
+        currentUser={state.currentUser}
+        datasets={state.datasets}
+      />
+
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={state.showProfileModal}
+        isDarkMode={state.isDarkMode}
+        onClose={() => updateState('showProfileModal', false)}
+        currentUser={state.currentUser}
+      />
+
+      {/* Add Data Source Modal */}
+      <AddDataSourceModal
+        isOpen={state.showAddSourceModal}
+        isDarkMode={state.isDarkMode}
+        onClose={() => updateState('showAddSourceModal', false)}
+        currentUser={state.currentUser}
+        onDatasetAdded={(sourceType: SourceType, licenseType: LicenseType, file?: File, sourceProvider?: string) => {
+          if (file) {
+            // Create a new dataset from the uploaded file
+            const newDataset: Dataset = {
+              id: `ds-${Date.now()}`,
+              title: file.name.replace(/\.[^/.]+$/, ''), // Remove file extension
+              sourceName: file.name,
+              sourceType: sourceType as any, // Cast to allow both types
+              licenseType: licenseType,
+              fileSize: file.size,
+              status: 'published',
+              downloads: 0,
+              dateAdded: new Date().toISOString(),
+              metadata: {
+                description: `Uploaded ${sourceType} dataset: ${file.name}`,
+                tags: [sourceType, 'uploaded']
+              }
+            };
+
+            // Add to datasets
+            const updatedDatasets = [...state.datasets, newDataset];
+            updateState('datasets', updatedDatasets);
+
+            // Add to uploaded files with proper structure for Data Wallet
+            const newUploadedFile = {
+              id: `file-${Date.now()}`,
+              name: file.name,
+              type: file.type || 'application/octet-stream',
+              size: file.size,
+              uploadDate: new Date().toISOString(),
+              folder: 'Uploaded Files' // Default folder
+            } as any;
+            const updatedFiles = [...state.uploadedFiles, newUploadedFile];
+            updateState('uploadedFiles', updatedFiles);
+
+            handleAddActivity(`Uploaded ${file.name}`, 'upload', '📤');
+          }
+          updateState('showAddSourceModal', false);
+        }}
+      />
+
+      {/* Data Wallet Modal */}
+      <DataWallet
+        isOpen={state.showDataWallet}
+        onClose={() => {
+          updateState('showDataWallet', false);
+          updateState('selectedWalletFolder', null);
+        }}
+        isDarkMode={state.isDarkMode}
+        initialFolder={state.selectedWalletFolder}
+        uploadedFiles={state.uploadedFiles as any}
+        userId={state.currentUser?.uid}
+      />
+
+      {/* Access Requests Modal */}
+      <AccessRequestsModal
+        isOpen={state.showAccessRequestsModal}
+        isDarkMode={state.isDarkMode}
+        onClose={() => updateState('showAccessRequestsModal', false)}
+        requests={state.accessRequests}
+        onApprove={async (requestId: string) => {
+          try {
+            // Find the request to get requester details
+            const request = state.accessRequests.find(r => r.id === requestId);
+            if (!request) {
+              alert('Request not found');
+              return;
+            }
+
+            // Generate API key
+            const apiKey = `datta_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Update in Firestore
+            if (state.currentUser?.uid) {
+              const requestRef = doc(db, 'users', state.currentUser.uid, 'accessRequests', requestId);
+              await updateDoc(requestRef, {
+                status: 'approved',
+                apiKey: apiKey,
+                reviewedAt: new Date().toISOString(),
+                reviewedBy: state.currentUser.uid
+              });
+              console.log('✅ Request approved in Firestore:', requestId);
+            }
+            
+            // Send approval email with API key
+            try {
+              const emailPayload = getApiKeyEmail(
+                request.requesterEmail,
+                request.aiLabName,
+                request.datasetName,
+                apiKey
+              );
+              
+              const emailResponse = await fetch('/api/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(emailPayload)
+              });
+
+              if (emailResponse.ok) {
+                console.log('✅ Approval email sent to:', request.requesterEmail);
+              } else {
+                console.warn('⚠️ Failed to send approval email, but request was approved');
+              }
+            } catch (emailError) {
+              console.warn('⚠️ Error sending email:', emailError);
+            }
+            
+            // Update local state
+            const updatedRequests = state.accessRequests.map(req => {
+              if (req.id === requestId) {
+                return {
+                  ...req,
+                  status: 'approved' as const,
+                  apiKey: apiKey,
+                };
+              }
+              return req;
+            });
+            updateState('accessRequests', updatedRequests);
+            handleAddActivity('Approved dataset access request', 'approval', '✅');
+            alert('✅ Request approved! API key sent to requester.');
+          } catch (error) {
+            console.error('❌ Error approving request:', error);
+            alert('Failed to approve request. Please try again.');
+          }
+        }}
+        onReject={async (requestId: string) => {
+          try {
+            // Find the request to get requester details
+            const request = state.accessRequests.find(r => r.id === requestId);
+            if (!request) {
+              alert('Request not found');
+              return;
+            }
+
+            // Update in Firestore
+            if (state.currentUser?.uid) {
+              const requestRef = doc(db, 'users', state.currentUser.uid, 'accessRequests', requestId);
+              await updateDoc(requestRef, {
+                status: 'rejected',
+                reviewedAt: new Date().toISOString(),
+                reviewedBy: state.currentUser.uid,
+                reason: 'Rejected by dataset owner'
+              });
+              console.log('❌ Request rejected in Firestore:', requestId);
+            }
+
+            // Send rejection email
+            try {
+              const emailPayload = getRejectionEmail(
+                request.requesterEmail,
+                request.aiLabName,
+                request.datasetName,
+                'The dataset owner has decided not to approve this request at this time.'
+              );
+              
+              const emailResponse = await fetch('/api/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(emailPayload)
+              });
+
+              if (emailResponse.ok) {
+                console.log('✅ Rejection email sent to:', request.requesterEmail);
+              } else {
+                console.warn('⚠️ Failed to send rejection email, but request was rejected');
+              }
+            } catch (emailError) {
+              console.warn('⚠️ Error sending email:', emailError);
+            }
+            
+            // Update local state
+            const updatedRequests = state.accessRequests.map(req => {
+              if (req.id === requestId) {
+                return { ...req, status: 'rejected' as const };
+              }
+              return req;
+            });
+            updateState('accessRequests', updatedRequests);
+            handleAddActivity('Rejected dataset access request', 'rejection', '❌');
+            alert('✅ Request rejected. Rejection email sent to requester.');
+          } catch (error) {
+            console.error('❌ Error rejecting request:', error);
+            alert('Failed to reject request. Please try again.');
+          }
+        }}
+      />
+    </div>
+  );
+};
+
+export default EnhancedDashboard;

@@ -39,7 +39,15 @@ export default function WalletFolder() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold mb-6">📁 {source} Files</h1>
+      <div className="mb-6 flex items-center gap-4">
+        <button
+          onClick={() => router.push('/wallet')}
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors flex items-center gap-2"
+        >
+          ← Back to Wallet
+        </button>
+        <h1 className="text-2xl font-bold">📁 {source} Files</h1>
+      </div>
 
       {loading ? (
         <p>Loading files...</p>
