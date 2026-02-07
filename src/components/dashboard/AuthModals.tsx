@@ -1,16 +1,23 @@
 // src/components/dashboard/AuthModals.tsx
 
+'use client'
+
 import React, { useState } from 'react';
 import { Github } from 'lucide-react';
 import {
   signInWithPopup,
   GoogleAuthProvider,
-  GithubAuthProvider,
   User as FirebaseUser
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { getTheme } from '../shared/theme';
+
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
 
 interface AuthModalsProps {
   isOpen: boolean;
@@ -35,7 +42,11 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
       console.log('🔐 Google sign-in initiated...');
       setSignupLoading(true);
       setSignupError('');
-
+      if (!auth) {
+        setSignupLoading(false);
+        setSignupError('Authentication not initialized. Check Firebase client config (NEXT_PUBLIC_... env vars) and reload the page.');
+        return;
+      }
       const provider = new GoogleAuthProvider();
       provider.addScope('profile');
       provider.addScope('email');
@@ -46,7 +57,7 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
       console.log('✅ Google sign-in successful!', user.uid);
 
       // Store/update user profile in Firestore
-      const userDocRef = doc(db, 'users', user.uid);
+      const userDocRef = doc(ensureDb(), 'users', user.uid);
       await setDoc(
         userDocRef,
         {
@@ -73,67 +84,145 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
       console.error('❌ Google sign-in error:', error);
       setSignupLoading(false);
 
-      if (error.code === 'auth/popup-closed-by-user') {
+      if (error?.code === 'auth/popup-closed-by-user') {
         setSignupError('Sign-in was cancelled. Please try again.');
-      } else if (error.code === 'auth/popup-blocked') {
+      } else if (error?.code === 'auth/popup-blocked') {
         setSignupError('Popup was blocked. Please allow popups for this site and try again.');
+      } else if (error?.code === 'auth/internal-error') {
+        setSignupError('Authentication internal error. Check Firebase configuration and OAuth redirect domains in the Firebase Console.');
+      } else if (error?.code === 'auth/unauthorized-domain') {
+        setSignupError('This domain is not authorized for OAuth. Add it to Firebase Console OAuth redirect domains.');
       } else {
-        setSignupError(error.message || 'Failed to sign in with Google. Please try again.');
+        setSignupError(error?.message || 'Failed to sign in with Google. Please try again.');
       }
     }
   };
 
-  // GitHub Sign In Handler
+  // GitHub Sign In Handler - Using custom OAuth popup instead of Firebase provider
   const handleGithubSignIn = async () => {
     try {
-      console.log('🔐 GitHub sign-in initiated...');
+      console.log('🔐 GitHub sign-in initiated via custom OAuth flow...');
       setSignupLoading(true);
       setSignupError('');
 
-      const provider = new GithubAuthProvider();
-      provider.addScope('user:email');
-      provider.addScope('read:user');
+      // Open GitHub OAuth in a popup window
+      const popupWidth = 500;
+      const popupHeight = 600;
+      const popupLeft = window.screenX + (window.outerWidth - popupWidth) / 2;
+      const popupTop = window.screenY + (window.outerHeight - popupHeight) / 2;
 
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      console.log('✅ GitHub sign-in successful!', user.uid);
-
-      // Store/update user profile in Firestore
-      const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(
-        userDocRef,
-        {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || 'GitHub User',
-          photoURL: user.photoURL || '',
-          authProvider: 'github',
-          createdAt: new Date().toISOString(),
-          dataSources: [],
-          wallet: [],
-          apiKeys: []
-        },
-        { merge: true }
+      const popup = window.open(
+        '/api/auth/github/start',
+        'github-auth',
+        `width=${popupWidth},height=${popupHeight},left=${popupLeft},top=${popupTop}`
       );
 
-      console.log('✅ User profile updated in Firestore');
+      if (!popup) {
+        setSignupLoading(false);
+        setSignupError('Popup blocked. Please allow popups for this site.');
+        return;
+      }
 
-      setSignupError('');
-      setSignupLoading(false);
-      onAuthSuccess(user);
-      onClose();
+      // Wait for postMessage from GitHub callback
+      const handleMessage = (event: MessageEvent) => {
+        // Validate origin for security
+        if (event.origin !== window.location.origin) return;
+
+        if (event.data.type === 'github-auth-success') {
+          console.log('✅ GitHub OAuth callback received');
+          const { user: githubUser, repos } = event.data.data;
+
+          // Create user profile via API with admin permissions
+          (async () => {
+            try {
+              const createUserResponse = await fetch('/api/auth/create-github-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: githubUser.id.toString(),
+                  email: githubUser.email || `${githubUser.login}@github.com`,
+                  displayName: githubUser.name || githubUser.login,
+                  photoURL: githubUser.avatar_url,
+                  githubLogin: githubUser.login
+                })
+              });
+
+              if (!createUserResponse.ok) {
+                const errorData = await createUserResponse.json();
+                throw new Error(errorData.error || 'Failed to create user profile');
+              }
+
+              console.log('✅ User profile created via API');
+
+              // Create a mock Firebase User object from GitHub data for local state
+              const mockUser = {
+                uid: githubUser.id.toString(),
+                email: githubUser.email || `${githubUser.login}@github.com`,
+                displayName: githubUser.name || githubUser.login,
+                photoURL: githubUser.avatar_url,
+                metadata: {
+                  creationTime: new Date().toISOString(),
+                  lastSignInTime: new Date().toISOString()
+                },
+                isAnonymous: false,
+                emailVerified: !!githubUser.email,
+                providerData: [{
+                  uid: githubUser.id.toString(),
+                  displayName: githubUser.name || githubUser.login,
+                  photoURL: githubUser.avatar_url,
+                  email: githubUser.email || `${githubUser.login}@github.com`,
+                  phoneNumber: null,
+                  providerId: 'github.com'
+                }],
+                getIdToken: async () => 'github-' + githubUser.id,
+                getIdTokenResult: async () => ({ token: 'github-' + githubUser.id }),
+                reload: async () => {},
+                delete: async () => {},
+                toJSON: () => ({})
+              } as unknown as FirebaseUser;
+
+              setSignupError('');
+              setSignupLoading(false);
+              onAuthSuccess(mockUser);
+              onClose();
+              window.removeEventListener('message', handleMessage);
+            } catch (error: any) {
+              console.error('❌ Error creating user profile:', error);
+              setSignupError('Failed to create user profile: ' + error.message);
+              setSignupLoading(false);
+              window.removeEventListener('message', handleMessage);
+            }
+          })();
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      // Timeout after 5 minutes
+      const timeout = setTimeout(() => {
+        window.removeEventListener('message', handleMessage);
+        setSignupLoading(false);
+        setSignupError('GitHub sign-in timed out. Please try again.');
+      }, 5 * 60 * 1000);
+
+      // Check if popup was closed
+      const popupCheckInterval = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(popupCheckInterval);
+          clearTimeout(timeout);
+          window.removeEventListener('message', handleMessage);
+          // Only set error if we didn't already succeed
+          if (signupLoading) {
+            setSignupLoading(false);
+            setSignupError('Sign-in window was closed. Please try again.');
+          }
+        }
+      }, 500);
+
     } catch (error: any) {
       console.error('❌ GitHub sign-in error:', error);
       setSignupLoading(false);
-
-      if (error.code === 'auth/popup-closed-by-user') {
-        setSignupError('Sign-in was cancelled. Please try again.');
-      } else if (error.code === 'auth/account-exists-with-different-credential') {
-        setSignupError('An account with this email already exists. Try a different sign-in method.');
-      } else {
-        setSignupError(error.message || 'Failed to sign in with GitHub. Please try again.');
-      }
+      setSignupError(error?.message || 'Failed to sign in with GitHub. Please try again.');
     }
   };
 

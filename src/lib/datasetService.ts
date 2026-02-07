@@ -63,6 +63,12 @@ function isValidCodeFile(file: File): boolean {
   return true;
 }
 
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
+
 /**
  * Upload a dataset file to Firestore (no Cloud Storage needed)
  */
@@ -108,7 +114,7 @@ export async function uploadDataset(
     console.log(`✅ File encoded, saving to Firestore...`);
 
     // Create dataset document in Firestore
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
 
     const datasetDoc = {
@@ -208,7 +214,7 @@ export async function getDatasets(userId: string, pageSize: number = 20): Promis
       return cachedDatasets;
     }
 
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     const q = query(datasetsRef, orderBy('dateAdded', 'desc'), limit(pageSize));
 
@@ -244,7 +250,7 @@ export async function getDatasetsPaginated(
   lastDocument?: any
 ): Promise<{ datasets: Dataset[]; lastDoc: any }> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     
     let q: any;
@@ -291,7 +297,7 @@ export async function getDatasetsBySourceType(
   sourceType: SourceType
 ): Promise<Dataset[]> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     const q = query(
       datasetsRef,
@@ -324,7 +330,7 @@ export async function getDatasetsByLicenseType(
   licenseType: LicenseType
 ): Promise<Dataset[]> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     const q = query(
       datasetsRef,
@@ -354,7 +360,7 @@ export async function getDatasetsByLicenseType(
  */
 export async function getDataset(userId: string, datasetId: string): Promise<Dataset> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     const datasetRef = doc(datasetsRef, datasetId);
 
@@ -386,7 +392,7 @@ export async function updateDatasetLicense(
   newLicenseType: LicenseType
 ): Promise<void> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     const datasetRef = doc(datasetsRef, datasetId);
 
@@ -412,7 +418,7 @@ export async function updateDatasetStatus(
   processingStatus?: number
 ): Promise<void> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     const datasetRef = doc(datasetsRef, datasetId);
 
@@ -442,7 +448,7 @@ export async function deleteDataset(
 ): Promise<void> {
   try {
     // Delete from Firestore (file data is stored inline, no Cloud Storage cleanup needed)
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     const datasetRef = doc(datasetsRef, datasetId);
 
@@ -511,7 +517,7 @@ export async function createGitHubDataset(
     );
 
     // Create dataset in Firestore
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
 
     const datasetDoc = {
@@ -588,7 +594,7 @@ export async function incrementDownloadCount(
   datasetId: string
 ): Promise<void> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
     const datasetRef = doc(datasetsRef, datasetId);
 
@@ -615,7 +621,7 @@ export async function incrementViewCount(
   datasetId: string
 ): Promise<void> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const datasetsRef = collection(userDocRef, 'datasets');
 
     const snapshot = await getDocs(

@@ -14,9 +14,10 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { User as FirebaseUser } from 'firebase/auth';
-import { collection, getDocs, doc, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, query, orderBy, limit, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getTheme } from '../shared/theme';
+import { requestDeduplicator } from '@/lib/performanceOptimizations';
 import { DataSource, Activity as ActivityType } from '../shared/types';
 
 interface DashboardContentProps {
@@ -62,76 +63,74 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
     { month: 'Apr', value: 0, growth: 0 }
   ]);
 
-  // Fetch real-time data from Firestore
+  // Fetch real-time data from Firestore with optimization
   useEffect(() => {
     const fetchRealTimeData = async () => {
       if (!isAuthenticated || !currentUser || !db) return;
 
       try {
         const userId = currentUser.uid;
+        const cacheKey = `dashboard_stats_${userId}`;
         
-        // Fetch datasets and calculate total upload
-        const datasetsRef = collection(db!, 'users', userId, 'datasets');
-        const datasetsSnapshot = await getDocs(datasetsRef);
-        let totalBytes = 0;
-        let totalEarn = 0;
-        const companies = new Set<string>();
-
-        console.log('📊 DashboardContent: Fetched', datasetsSnapshot.size, 'datasets');
-
-        datasetsSnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          console.log('📁 Dataset Full Object:', data);
-          console.log('  - Name:', data.sourceName || data.title);
-          console.log('  - fileSize:', data.fileSize);
-          console.log('  - size:', data.size);
-          console.log('  - bytes:', data.bytes);
-          console.log('  - All keys:', Object.keys(data));
+        // Use request deduplication to avoid duplicate requests
+        await requestDeduplicator.execute(cacheKey, async () => {
+          // Fetch datasets with pagination to limit data
+          const datasetsRef = collection(db!, 'users', userId, 'datasets');
+          const q = query(datasetsRef, orderBy('dateAdded', 'desc'), limit(100));
+          const datasetsSnapshot = await getDocs(q);
           
-          // Try multiple field names for file size
-          let fileSize = data.fileSize || data.size || data.bytes || 0;
-          console.log('  - Using fileSize:', fileSize);
+          let totalBytes = 0;
+          let totalEarn = 0;
+          const companies = new Set<string>();
+
+          console.log('📊 DashboardContent: Fetched', datasetsSnapshot.size, 'datasets');
+
+          datasetsSnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            
+            // Try multiple field names for file size
+            let fileSize = data.fileSize || data.size || data.bytes || 0;
+            
+            if (fileSize && fileSize > 0) {
+              totalBytes += fileSize;
+            }
+            if (data.earnings?.monthlyRevenue) {
+              totalEarn += data.earnings.monthlyRevenue;
+            }
+            if (data.companyName) {
+              companies.add(data.companyName);
+            }
+          });
+
+          console.log('📈 Total bytes calculated:', totalBytes, '| Total earn:', totalEarn);
+
+          // Set active sources count to number of datasets
+          setActiveSourcesCount(datasetsSnapshot.size);
+
+          // Convert bytes to GB
+          const totalGB = (totalBytes / (1024 * 1024 * 1024)).toFixed(2);
+          setTotalDataUpload(`${totalGB} GB`);
           
-          if (fileSize && fileSize > 0) {
-            totalBytes += fileSize;
-          }
-          if (data.earnings?.monthlyRevenue) {
-            totalEarn += data.earnings.monthlyRevenue;
-          }
-          if (data.companyName) {
-            companies.add(data.companyName);
-          }
+          // Set earnings
+          setTotalEarnings(`$${totalEarn.toFixed(2)}`);
+          
+          // Set companies count
+          setCompaniesCount(companies.size.toString());
+
+          // Fetch wallet folders
+          const walletRef = collection(db!, 'users', userId, 'wallet');
+          const walletSnapshot = await getDocs(walletRef);
+          setFoldersCount(walletSnapshot.size.toString());
+
+          // Fetch recent earnings for chart
+          const recentEarnings = [
+            { month: 'Jan', value: Math.floor(totalEarn * 0.3), growth: 5 },
+            { month: 'Feb', value: Math.floor(totalEarn * 0.4), growth: 16.7 },
+            { month: 'Mar', value: Math.floor(totalEarn * 0.5), growth: 28.6 },
+            { month: 'Apr', value: Math.floor(totalEarn * 0.6), growth: 20 }
+          ];
+          setEarningsData(recentEarnings);
         });
-
-        console.log('📈 Total bytes calculated:', totalBytes, '| Total earn:', totalEarn);
-
-        // Set active sources count to number of datasets
-        setActiveSourcesCount(datasetsSnapshot.size);
-
-        // Convert bytes to GB
-        const totalGB = (totalBytes / (1024 * 1024 * 1024)).toFixed(2);
-        console.log('🔢 Conversion: ', totalBytes, 'bytes →', totalGB, 'GB');
-        setTotalDataUpload(`${totalGB} GB`);
-        
-        // Set earnings
-        setTotalEarnings(`$${totalEarn.toFixed(2)}`);
-        
-        // Set companies count
-        setCompaniesCount(companies.size.toString());
-
-        // Fetch wallet folders
-        const walletRef = collection(db!, 'users', userId, 'wallet');
-        const walletSnapshot = await getDocs(walletRef);
-        setFoldersCount(walletSnapshot.size.toString());
-
-        // Fetch recent earnings for chart
-        const recentEarnings = [
-          { month: 'Jan', value: Math.floor(totalEarn * 0.3), growth: 5 },
-          { month: 'Feb', value: Math.floor(totalEarn * 0.4), growth: 16.7 },
-          { month: 'Mar', value: Math.floor(totalEarn * 0.5), growth: 28.6 },
-          { month: 'Apr', value: Math.floor(totalEarn * 0.6), growth: 20 }
-        ];
-        setEarningsData(recentEarnings);
       } catch (error) {
         console.error('Error fetching real-time data:', error);
       }

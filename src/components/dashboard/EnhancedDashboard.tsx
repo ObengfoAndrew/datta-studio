@@ -23,6 +23,7 @@ import AnnotationDashboard from './AnnotationDashboard';
 import { getTheme } from '../shared/theme';
 import { Activity, Dataset, DataSource } from '../shared/types';
 import { SourceType, LicenseType, AccessRequest } from '@/lib/types';
+import { requestDeduplicator } from '@/lib/performanceOptimizations';
 
 interface EnhancedDashboardState {
   isAuthenticated: boolean;
@@ -94,6 +95,7 @@ const EnhancedDashboard: React.FC = () => {
 
   // Firebase Auth State
   useEffect(() => {
+    if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         updateState('currentUser', user);
@@ -110,82 +112,91 @@ const EnhancedDashboard: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Fetch user datasets from Firestore (uploaded + GitHub/GitLab imports)
+  // Fetch user datasets and access requests in parallel with deduplication
   useEffect(() => {
     if (state.currentUser?.uid) {
-      const fetchUserDatasets = async () => {
+      const fetchUserData = async () => {
         try {
-          console.log('📊 Fetching datasets for user:', state.currentUser?.uid);
-          const firestoreDatasets = await getDatasets(state.currentUser!.uid);
+          const userId = state.currentUser!.uid;
           
-          if (firestoreDatasets.length > 0) {
-            console.log('✅ Loaded', firestoreDatasets.length, 'datasets from Firestore');
-            // Convert Firestore datasets to the shared Dataset type
-            const convertedDatasets = firestoreDatasets.map((ds: any) => ({
-              id: ds.id || ds.docId,
-              title: ds.sourceName || ds.title || 'Untitled Dataset',
-              sourceName: ds.sourceName,
-              sourceType: ds.sourceType,
-              licenseType: ds.licenseType,
-              status: ds.status,
-              downloads: ds.downloads || 0,
-              fileSize: ds.fileSize || 0,
-              dateAdded: ds.dateAdded,
-              metadata: ds.metadata || { description: '', tags: [] }
-            }));
-            // Set datasets from Firestore (no sample data)
-            updateState('datasets', convertedDatasets);
-          }
+          // Use request deduplication to avoid duplicate requests during re-renders
+          await requestDeduplicator.execute(
+            `user_data_${userId}`,
+            async () => {
+              // Fetch both datasets and access requests in parallel
+              const [firestoreDatasets, accessRequestsData] = await Promise.all([
+                // Fetch datasets
+                (async () => {
+                  try {
+                    console.log('📊 Fetching datasets for user:', userId);
+                    const datasets = await getDatasets(userId);
+                    if (datasets.length > 0) {
+                      console.log('✅ Loaded', datasets.length, 'datasets from Firestore');
+                      return datasets.map((ds: any) => ({
+                        id: ds.id || ds.docId,
+                        title: ds.sourceName || ds.title || 'Untitled Dataset',
+                        sourceName: ds.sourceName,
+                        sourceType: ds.sourceType,
+                        licenseType: ds.licenseType,
+                        status: ds.status,
+                        downloads: ds.downloads || 0,
+                        fileSize: ds.fileSize || 0,
+                        dateAdded: ds.dateAdded,
+                        metadata: ds.metadata || { description: '', tags: [] }
+                      }));
+                    }
+                    return [];
+                  } catch (error) {
+                    console.error('❌ Error fetching datasets:', error);
+                    return [];
+                  }
+                })(),
+                // Fetch access requests
+                (async () => {
+                  try {
+                    if (!db) return [];
+                    console.log('📬 Fetching access requests for user:', userId);
+                    
+                    const userAccessRequestsRef = collection(db as any, 'users', userId, 'accessRequests');
+                    const accessRequestsSnapshot = await getDocs(userAccessRequestsRef);
+                    
+                    const requests: AccessRequest[] = [];
+                    accessRequestsSnapshot.forEach(doc => {
+                      const data = doc.data();
+                      requests.push({
+                        id: doc.id,
+                        datasetName: data.datasetTitle || data.datasetName || 'Unknown Dataset',
+                        aiLabName: data.requesterCompany || data.requesterName || 'Unknown Lab',
+                        requesterEmail: data.requesterEmail || '',
+                        purpose: data.purpose || '',
+                        requestedAt: data.createdAt || new Date().toISOString(),
+                        status: data.status || 'pending',
+                        apiKey: data.apiKey,
+                      });
+                    });
+                    
+                    if (requests.length > 0) {
+                      console.log('✅ Loaded', requests.length, 'access requests from Firestore');
+                    }
+                    return requests;
+                  } catch (error) {
+                    console.error('❌ Error fetching access requests:', error);
+                    return [];
+                  }
+                })()
+              ]);
+
+              // Update state with both datasets and access requests
+              updateState('datasets', firestoreDatasets);
+              updateState('accessRequests', accessRequestsData);
+            }
+          );
         } catch (error) {
-          console.error('❌ Error fetching datasets:', error);
-          // Keep empty datasets if fetch fails
+          console.error('❌ Error fetching user data:', error);
         }
       };
 
-      fetchUserDatasets();
-    }
-  }, [state.currentUser?.uid]);
-
-  // Fetch access requests for the current user's datasets
-  useEffect(() => {
-    if (state.currentUser?.uid) {
-      const fetchAccessRequests = async () => {
-        try {
-          console.log('📬 Fetching access requests for user:', state.currentUser?.uid);
-          
-          // Get the user's access requests collection
-          const userAccessRequestsRef = collection(db, 'users', state.currentUser!.uid, 'accessRequests');
-          const accessRequestsSnapshot = await getDocs(userAccessRequestsRef);
-          
-          const requests: AccessRequest[] = [];
-          accessRequestsSnapshot.forEach(doc => {
-            const data = doc.data();
-            requests.push({
-              id: doc.id,
-              datasetName: data.datasetTitle || data.datasetName || 'Unknown Dataset',
-              aiLabName: data.requesterCompany || data.requesterName || 'Unknown Lab',
-              requesterEmail: data.requesterEmail || '',
-              purpose: data.purpose || '',
-              requestedAt: data.createdAt || new Date().toISOString(),
-              status: data.status || 'pending',
-              apiKey: data.apiKey,
-            });
-          });
-          
-          if (requests.length > 0) {
-            console.log('✅ Loaded', requests.length, 'access requests from Firestore');
-            updateState('accessRequests', requests);
-          } else {
-            console.log('📭 No access requests found');
-            updateState('accessRequests', []);
-          }
-        } catch (error) {
-          console.error('❌ Error fetching access requests:', error);
-          updateState('accessRequests', []);
-        }
-      };
-
-      fetchAccessRequests();
+      fetchUserData();
     }
   }, [state.currentUser?.uid]);
 
@@ -200,6 +211,7 @@ const EnhancedDashboard: React.FC = () => {
   const handleLogout = async () => {
     try {
       console.log('🚪 Signing out...');
+      if (!auth) throw new Error('Auth not initialized');
       await signOut(auth);
       updateState('isAuthenticated', false);
       updateState('currentUser', null);
@@ -414,8 +426,8 @@ const EnhancedDashboard: React.FC = () => {
             const apiKey = `datta_${Math.random().toString(36).substr(2, 9)}`;
             
             // Update in Firestore
-            if (state.currentUser?.uid) {
-              const requestRef = doc(db, 'users', state.currentUser.uid, 'accessRequests', requestId);
+            if (state.currentUser?.uid && db) {
+              const requestRef = doc(db as any, 'users', state.currentUser.uid, 'accessRequests', requestId);
               await updateDoc(requestRef, {
                 status: 'approved',
                 apiKey: apiKey,
@@ -478,8 +490,8 @@ const EnhancedDashboard: React.FC = () => {
             }
 
             // Update in Firestore
-            if (state.currentUser?.uid) {
-              const requestRef = doc(db, 'users', state.currentUser.uid, 'accessRequests', requestId);
+            if (state.currentUser?.uid && db) {
+              const requestRef = doc(db as any, 'users', state.currentUser.uid, 'accessRequests', requestId);
               await updateDoc(requestRef, {
                 status: 'rejected',
                 reviewedAt: new Date().toISOString(),

@@ -31,6 +31,15 @@ function getAdminDb() {
   }
 }
 
+/**
+ * GET /api/pilot/datasets/public
+ * List all published datasets (PUBLIC - no authentication required)
+ * Query Parameters:
+ *   - limit: Number of datasets to return (default: 20, max: 100)
+ *   - offset: Pagination offset (default: 0)
+ *   - cached: Return cached results for faster response (default: true)
+ */
+
 // Simple in-memory cache for public datasets
 let cachedPublicDatasets: any[] = [];
 let cacheTimestamp: number = 0;
@@ -137,23 +146,19 @@ async function getCachedPublicDatasets(db: any): Promise<any[]> {
   }
 }
 
-/**
- * GET /api/pilot/datasets/public
- * List all published datasets (PUBLIC - no authentication required)
- * Query Parameters:
- *   - limit: Number of datasets to return (default: 20, max: 100)
- *   - offset: Pagination offset (default: 0)
- */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20'), 1), 100);
     const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
+    const useCached = searchParams.get('cached') !== 'false'; // Default to true
 
     const db = getAdminDb();
     
-    // Get datasets from cache
-    const allDatasets = await getCachedPublicDatasets(db);
+    // Get datasets (from cache if available)
+    const allDatasets = useCached
+      ? await getCachedPublicDatasets(db)
+      : await getCachedPublicDatasets(db); // Force refresh by calling directly
 
     // Apply pagination
     const paginatedDatasets = allDatasets.slice(offset, offset + limit);

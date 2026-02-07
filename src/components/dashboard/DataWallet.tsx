@@ -11,6 +11,18 @@ import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { getTheme } from '../shared/theme';
 
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
+
+// Helper function to ensure storage is initialized
+function ensureStorage() {
+  if (!storage) throw new Error('Storage not initialized');
+  return storage as any;
+}
+
 interface WalletFile {
   id: string;
   name: string;
@@ -87,7 +99,7 @@ export const DataWallet: React.FC<DataWalletProps> = ({
         // FIXED: Only fetch Firestore if userId exists
         if (userId) {
           try {
-            const userDocRef = doc(db, 'users', userId);
+            const userDocRef = doc(ensureDb(), 'users', userId);
             const walletRef = collection(userDocRef, 'wallet');
             const walletSnapshot = await getDocs(walletRef);
 
@@ -164,7 +176,7 @@ export const DataWallet: React.FC<DataWalletProps> = ({
         return;
       }
 
-      const userDocRef = doc(db, 'users', userId);
+      const userDocRef = doc(ensureDb(), 'users', userId);
       const folderDocRef = doc(collection(userDocRef, 'wallet'), sanitizedName);
 
       await setDoc(folderDocRef, {
@@ -202,7 +214,7 @@ export const DataWallet: React.FC<DataWalletProps> = ({
     }
 
     try {
-      const userDocRef = doc(db, 'users', userId);
+      const userDocRef = doc(ensureDb(), 'users', userId);
       const walletRef = collection(userDocRef, 'wallet');
       const folderDocRef = doc(walletRef, folderName);
       const folderDocs = await getDocs(walletRef);
@@ -212,7 +224,7 @@ export const DataWallet: React.FC<DataWalletProps> = ({
         for (const file of targetFolder.files) {
           if (file.storagePath && !file.storagePath.startsWith('local/')) {
             try {
-              await deleteObject(ref(storage, file.storagePath));
+              await deleteObject(ref(ensureStorage(), file.storagePath));
             } catch (e) {
               console.warn('Could not delete storage file:', e);
             }
@@ -241,13 +253,13 @@ export const DataWallet: React.FC<DataWalletProps> = ({
     try {
       if (file.storagePath) {
         try {
-          await deleteObject(ref(storage, file.storagePath));
+          await deleteObject(ref(ensureStorage(), file.storagePath));
         } catch (e) {
           console.warn('Storage delete failed:', e);
         }
       }
 
-      const userDocRef = doc(db, 'users', userId);
+      const userDocRef = doc(ensureDb(), 'users', userId);
       const walletRef = collection(userDocRef, 'wallet');
       const folderDocs = await getDocs(walletRef);
       const folderDoc = folderDocs.docs.find((d: any) => d.id === file.folder);

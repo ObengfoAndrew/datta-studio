@@ -12,6 +12,9 @@ import { collection, doc, setDoc, serverTimestamp, query, where, getDocs } from 
 
 export async function POST(request: NextRequest) {
   try {
+    if (!db) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 });
+    }
     // Step 1: Validate API key
     const validation = await validateApiKey(request);
     if (!validation.valid) {

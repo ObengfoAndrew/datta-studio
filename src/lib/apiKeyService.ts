@@ -6,6 +6,12 @@
 import { doc, collection, addDoc, getDocs, query, where, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
+
 export interface ApiKey {
   id: string;
   userId: string;
@@ -34,7 +40,7 @@ export function generateApiKey(): string {
  */
 export async function createApiKey(userId: string, connectionId: string): Promise<ApiKey> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const apiKeysRef = collection(userDocRef, 'apiKeys');
     
     const apiKey = generateApiKey();
@@ -67,7 +73,7 @@ export async function validateApiKey(apiKey: string): Promise<{ userId: string; 
   try {
     // Search across all users for the API key
     // Note: This is not efficient for large scale - consider using a separate collection
-    const usersRef = collection(db, 'users');
+    const usersRef = collection(ensureDb(), 'users');
     const usersSnapshot = await getDocs(usersRef);
 
     for (const userDoc of usersSnapshot.docs) {
@@ -107,7 +113,7 @@ export async function validateApiKey(apiKey: string): Promise<{ userId: string; 
  */
 export async function getApiKeyByConnectionId(userId: string, connectionId: string): Promise<ApiKey | null> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const apiKeysRef = collection(userDocRef, 'apiKeys');
     const q = query(
       apiKeysRef,
@@ -135,7 +141,7 @@ export async function getApiKeyByConnectionId(userId: string, connectionId: stri
  */
 export async function revokeApiKey(userId: string, apiKeyId: string): Promise<void> {
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const apiKeysRef = collection(userDocRef, 'apiKeys');
     const apiKeyRef = doc(apiKeysRef, apiKeyId);
 

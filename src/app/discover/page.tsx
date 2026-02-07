@@ -1,5 +1,8 @@
 'use client'
 
+// This page should be dynamic (client-rendered, not statically generated)
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import {
   Search,
@@ -461,49 +464,8 @@ export default function DiscoverPage() {
         )}
 
         {/* AI Lab Connection Required Message */}
-        {!loading && !aiLabConnectionActive && (
-          <div style={{
-            backgroundColor: isDarkMode ? '#1e293b' : '#fef3c7',
-            border: `2px solid ${isDarkMode ? '#fbbf24' : '#fbbf24'}`,
-            borderRadius: '12px',
-            padding: '40px 20px',
-            textAlign: 'center',
-            marginBottom: '40px'
-          }}>
-            <Database style={{
-              width: '48px',
-              height: '48px',
-              margin: '0 auto 16px',
-              color: '#f59e0b'
-            }} />
-            <h3 style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              margin: '0 0 12px',
-              color: isDarkMode ? currentTheme.text : '#92400e'
-            }}>
-              Enable AI Lab Connection
-            </h3>
-            <p style={{
-              fontSize: '14px',
-              color: isDarkMode ? currentTheme.textSecondary : '#b45309',
-              margin: '0 0 20px',
-              lineHeight: '1.6'
-            }}>
-              To view and request datasets, you need to enable AI Lab connection in your Data Wallet settings.
-            </p>
-            <p style={{
-              fontSize: '13px',
-              color: isDarkMode ? currentTheme.textSecondary : '#92400e',
-              margin: 0
-            }}>
-              📍 Go to <strong>Data Wallet</strong> → <strong>AI Lab API</strong> → Enable Connection
-            </p>
-          </div>
-        )}
-
-        {/* Datasets Grid */}
-        {!loading && aiLabConnectionActive && filteredDatasets.length > 0 && (
+        {/* Datasets Grid - Show without needing AI Lab connection */}
+        {!loading && filteredDatasets.length > 0 && (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
@@ -648,7 +610,7 @@ export default function DiscoverPage() {
         )}
 
         {/* Empty State */}
-        {!loading && aiLabConnectionActive && filteredDatasets.length === 0 && (
+        {!loading && filteredDatasets.length === 0 && (
           <div style={{
             textAlign: 'center',
             padding: '60px 20px',

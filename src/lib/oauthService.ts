@@ -1,6 +1,12 @@
 import { db } from './firebase';
 import { collection, addDoc, setDoc, doc } from 'firebase/firestore';
 
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
+
 /**
  * GitHub OAuth Service
  * Fetches repositories and user data from GitHub
@@ -257,8 +263,7 @@ export async function saveDatasetToFirestore(
   file?: Blob
 ) {
   try {
-    const datasetsCollection = collection(db, 'users', userId, 'datasets');
-
+    const datasetsCollection = collection(ensureDb(), 'users', userId, 'datasets');
     const dataset = {
       id: `${sourceProvider}-${sourceData.id}`,
       userId,
@@ -308,7 +313,7 @@ export async function saveDatasetToFirestore(
  */
 export async function getConnectedSources(userId: string) {
   try {
-    const sourcesRef = collection(db, 'users', userId, 'connectedSources');
+    const sourcesRef = collection(ensureDb(), 'users', userId, 'connectedSources');
     // In real implementation, you'd query this collection
     return [];
   } catch (error) {
@@ -327,7 +332,7 @@ export async function saveConnectedSource(
   accessToken: string
 ) {
   try {
-    const sourceDoc = doc(db, 'users', userId, 'connectedSources', provider);
+    const sourceDoc = doc(ensureDb(), 'users', userId, 'connectedSources', provider);
     await setDoc(sourceDoc, {
       provider,
       userData,

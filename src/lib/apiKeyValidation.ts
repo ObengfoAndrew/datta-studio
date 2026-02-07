@@ -7,6 +7,12 @@ import { NextRequest } from 'next/server';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
+
 export interface ApiKeyValidationResult {
   valid: boolean;
   userId?: string;
@@ -39,7 +45,7 @@ export async function validateApiKey(request: NextRequest): Promise<ApiKeyValida
 
     // Search for the API key in Firestore
     // Since we can't do cross-collection queries easily, we search all users
-    const usersRef = collection(db, 'users');
+    const usersRef = collection(ensureDb(), 'users');
     const usersSnapshot = await getDocs(usersRef);
 
     for (const userDoc of usersSnapshot.docs) {

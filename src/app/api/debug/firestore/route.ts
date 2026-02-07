@@ -7,8 +7,11 @@ export const runtime = 'nodejs';
 
 export async function GET() {
   try {
+    if (!db) {
+      return NextResponse.json({ error: 'Firebase not initialized' }, { status: 500 });
+    }
     const userId = 'demo-user';
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(db as any, 'users', userId);
     const walletRef = collection(userDocRef, 'wallet');
     
     console.log('Attempting to read from Firestore...');
@@ -35,8 +38,11 @@ export async function GET() {
 
 export async function POST() {
   try {
+    if (!db) {
+      return NextResponse.json({ error: 'Firebase not initialized' }, { status: 500 });
+    }
     const userId = 'demo-user';
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(db as any, 'users', userId);
     const walletRef = collection(userDocRef, 'wallet');
     
     const testDocId = `test-${Date.now()}`;

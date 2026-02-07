@@ -28,7 +28,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Find the dataset owner
-    const usersRef = collection(db, 'users');
+    if (!db) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 });
+    }
+    const usersRef = collection(db as any, 'users');
     const usersSnapshot = await getDocs(usersRef);
 
     let requestCreated = false;
@@ -94,6 +97,9 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    if (!db) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 });
+    }
     // Validate API key
     const validation = await validateApiKey(request);
     if (!validation.valid) {

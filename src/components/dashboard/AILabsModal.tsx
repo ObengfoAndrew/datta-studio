@@ -9,6 +9,12 @@ import { getDatasets } from '@/lib/datasetService';
 import { getTheme } from '../shared/theme';
 import { Dataset } from '../shared/types';
 
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
+
 interface AILabsModalProps {
   isOpen: boolean;
   isDarkMode: boolean;
@@ -35,8 +41,12 @@ export const AILabsModal: React.FC<AILabsModalProps> = ({
   const [modalDatasets, setModalDatasets] = useState<Dataset[]>(datasets);
 
   useEffect(() => {
+    // Only check connection when modal first opens and user is authenticated
     if (isOpen && isAuthenticated && currentUser) {
-      checkExistingConnection();
+      // Only check if we don't already have a connection loaded
+      if (connectionStatus === 'idle' && !connectionId) {
+        checkExistingConnection();
+      }
     }
   }, [isOpen, isAuthenticated, currentUser]);
 
@@ -49,7 +59,10 @@ export const AILabsModal: React.FC<AILabsModalProps> = ({
 
   // Keep local state in sync with prop datasets
   useEffect(() => {
-    setModalDatasets(datasets);
+    // Filter to show only published datasets (also include datasets without status field)
+    const publishedDatasets = datasets.filter((d) => !d.status || d.status === 'published');
+    console.log(`📊 Filtered ${datasets.length} total datasets → ${publishedDatasets.length} published`);
+    setModalDatasets(publishedDatasets);
   }, [datasets]);
 
   const fetchAndDisplayDatasets = async () => {
@@ -92,7 +105,7 @@ export const AILabsModal: React.FC<AILabsModalProps> = ({
 
   const checkExistingConnection = async () => {
     try {
-      const userDocRef = doc(db, 'users', currentUser!.uid);
+      const userDocRef = doc(ensureDb(), 'users', currentUser!.uid);
       const aiLabsRef = collection(userDocRef, 'aiLabConnections');
       const snapshot = await getDocs(aiLabsRef);
 
@@ -133,7 +146,7 @@ export const AILabsModal: React.FC<AILabsModalProps> = ({
       const userId = currentUser.uid;
       console.log('🔌 Creating AI Lab connection for user:', userId);
 
-      const userDocRef = doc(db, 'users', userId);
+      const userDocRef = doc(ensureDb(), 'users', userId);
       const aiLabsRef = collection(userDocRef, 'aiLabConnections');
       const newConnectionId = `ai_lab_${Math.random().toString(36).substr(2, 16)}`;
 
@@ -216,7 +229,7 @@ export const AILabsModal: React.FC<AILabsModalProps> = ({
       setConnectionStatus('connecting');
 
       const userId = currentUser.uid;
-      const userDocRef = doc(db, 'users', userId);
+      const userDocRef = doc(ensureDb(), 'users', userId);
       const aiLabsRef = collection(userDocRef, 'aiLabConnections');
 
       const snapshot = await getDocs(aiLabsRef);
@@ -398,7 +411,7 @@ export const AILabsModal: React.FC<AILabsModalProps> = ({
               <div style={{ textAlign: 'center', padding: '24px', color: theme.textSecondary }}>
                 <Database style={{ width: '32px', height: '32px', margin: '0 auto 12px', opacity: 0.5 }} />
                 <p style={{ margin: 0, fontSize: '13px' }}>
-                  No datasets available yet. Upload data to share with AI labs.
+                  No published datasets yet. <br/> Upload and publish data to share with AI labs.
                 </p>
               </div>
             ) : (
@@ -428,7 +441,7 @@ export const AILabsModal: React.FC<AILabsModalProps> = ({
                         {dataset.title || dataset.sourceName || 'Unnamed Dataset'}
                       </div>
                       <div style={{ fontSize: '12px', color: theme.textSecondary }}>
-                        {dataset.size ? (dataset.size / 1024 / 1024).toFixed(2) : 'Unknown'} MB {dataset.sourceType ? `• ${dataset.sourceType}` : ''}
+                        {dataset.fileSize ? (dataset.fileSize / 1024 / 1024).toFixed(2) : 'Unknown'} MB {dataset.sourceType ? `• ${dataset.sourceType}` : ''}
                       </div>
                     </div>
                     <div

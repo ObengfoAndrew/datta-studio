@@ -4,6 +4,9 @@ import { ValidationUtils } from '@/lib/validationUtils';
 import { db } from '@/lib/firebase';
 import { collection, doc, setDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 
+// This route should be dynamic (not statically generated)
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/pilot/datasets
  * List all available published datasets with search and pagination
@@ -44,7 +47,10 @@ export async function GET(request: NextRequest) {
     offset = Math.max(offset, 0);
 
     // Get all published datasets from Firestore
-    const usersRef = collection(db, 'users');
+    if (!db) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 });
+    }
+    const usersRef = collection(db as any, 'users');
     const usersSnapshot = await getDocs(usersRef);
     
     const allDatasets: any[] = [];
@@ -189,6 +195,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!db) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 });
+    }
     // Step 1: Validate API key
     const validation = await validateApiKey(request);
     if (!validation.valid) {

@@ -28,7 +28,10 @@ export async function GET(
     }
 
     // Get dataset - query by id field (datasets are stored with id field)
-    const userDocRef = doc(db, 'users', validation.userId!);
+    if (!db) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 });
+    }
+    const userDocRef = doc(db as any, 'users', validation.userId!);
     const datasetsRef = collection(userDocRef, 'datasets');
     const q = query(datasetsRef, where('id', '==', datasetId));
     const snapshot = await getDocs(q);

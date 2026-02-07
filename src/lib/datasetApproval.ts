@@ -7,6 +7,12 @@ import { collection, doc, getDoc, updateDoc, serverTimestamp, setDoc, query, whe
 import { db } from './firebase';
 import { ref, getBytes } from 'firebase/storage';
 
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
+
 export interface ApprovalResult {
   success: boolean;
   requestId: string;
@@ -32,7 +38,7 @@ export async function approveAccessRequest(
 
   try {
     // Step 1: Get the access request
-    const requestRef = doc(db, 'users', userId, 'datasets', datasetId, 'accessRequests', requestId);
+    const requestRef = doc(ensureDb(), 'users', userId, 'datasets', datasetId, 'accessRequests', requestId);
     const requestSnapshot = await getDoc(requestRef);
 
     if (!requestSnapshot.exists()) {
@@ -72,7 +78,7 @@ export async function approveAccessRequest(
     });
 
     // Step 5: Add to allowed users in dataset
-    const datasetRef = doc(db, 'users', userId, 'datasets', datasetId);
+    const datasetRef = doc(ensureDb(), 'users', userId, 'datasets', datasetId);
     const datasetSnapshot = await getDoc(datasetRef);
     
     if (!datasetSnapshot.exists()) {
@@ -141,7 +147,7 @@ export async function rejectAccessRequest(
 ): Promise<ApprovalResult> {
   try {
     // Step 1: Get the access request
-    const requestRef = doc(db, 'users', userId, 'datasets', datasetId, 'accessRequests', requestId);
+    const requestRef = doc(ensureDb(), 'users', userId, 'datasets', datasetId, 'accessRequests', requestId);
     const requestSnapshot = await getDoc(requestRef);
 
     if (!requestSnapshot.exists()) {
@@ -175,7 +181,7 @@ export async function rejectAccessRequest(
     });
 
     // Step 4: Update dataset stats
-    const datasetRef = doc(db, 'users', userId, 'datasets', datasetId);
+    const datasetRef = doc(ensureDb(), 'users', userId, 'datasets', datasetId);
     const datasetSnapshot = await getDoc(datasetRef);
     const dataset = datasetSnapshot.data();
     const stats = dataset?.stats || {};
@@ -258,7 +264,7 @@ export function validateAccessToken(token: string): {
  */
 export async function getPendingRequests(userId: string, datasetId: string) {
   try {
-    const requestsRef = collection(db, 'users', userId, 'datasets', datasetId, 'accessRequests');
+    const requestsRef = collection(ensureDb(), 'users', userId, 'datasets', datasetId, 'accessRequests');
     const q = query(requestsRef, where('status', '==', 'pending'));
     const snapshot = await getDocs(q);
 
@@ -277,7 +283,7 @@ export async function getPendingRequests(userId: string, datasetId: string) {
  */
 export async function getAccessRequests(userId: string, datasetId: string, status?: string) {
   try {
-    const requestsRef = collection(db, 'users', userId, 'datasets', datasetId, 'accessRequests');
+    const requestsRef = collection(ensureDb(), 'users', userId, 'datasets', datasetId, 'accessRequests');
     let q;
 
     if (status) {
@@ -310,7 +316,7 @@ export async function approvePublicAccessRequest(
 
   try {
     // Step 1: Get the request (search in accessRequests collection)
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(ensureDb(), 'users', userId);
     const accessRequestsRef = collection(userDocRef, 'accessRequests');
     
     // Find the specific request
@@ -425,7 +431,7 @@ export async function approvePublicAccessRequest(
  */
 export async function hasAccessToDataset(userId: string, datasetId: string, connectionId: string): Promise<boolean> {
   try {
-    const datasetRef = doc(db, 'users', userId, 'datasets', datasetId);
+    const datasetRef = doc(ensureDb(), 'users', userId, 'datasets', datasetId);
     const datasetSnapshot = await getDoc(datasetRef);
 
     if (!datasetSnapshot.exists()) {
@@ -437,7 +443,7 @@ export async function hasAccessToDataset(userId: string, datasetId: string, conn
 
     if (allowedUsers.includes(connectionId)) {
       // Check if access has expired
-      const requestsRef = collection(db, 'users', userId, 'datasets', datasetId, 'accessRequests');
+      const requestsRef = collection(ensureDb(), 'users', userId, 'datasets', datasetId, 'accessRequests');
       const q = query(
         requestsRef,
         where('requesterConnectionId', '==', connectionId),

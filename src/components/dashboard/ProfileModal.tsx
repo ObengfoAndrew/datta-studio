@@ -8,6 +8,12 @@ import { db } from '@/lib/firebase';
 import { getTheme } from '../shared/theme';
 import { getDatasets } from '@/lib/datasetService';
 
+// Helper function to ensure db is initialized
+function ensureDb() {
+  if (!db) throw new Error('Database not initialized');
+  return db as any;
+}
+
 interface ProfileModalProps {
   isOpen: boolean;
   isDarkMode: boolean;
@@ -46,7 +52,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     try {
       const userId = currentUser.uid;
-      const userDocRef = doc(db, 'users', userId);
+      const userDocRef = doc(ensureDb(), 'users', userId);
 
       // Get datasets
       const datasets = await getDatasets(userId);
@@ -72,7 +78,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     try {
       const userId = currentUser.uid;
-      const userDocRef = doc(db, 'users', userId);
+      const userDocRef = doc(ensureDb(), 'users', userId);
 
       await setDoc(
         userDocRef,
