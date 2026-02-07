@@ -23,13 +23,17 @@ interface DashboardSidebarProps {
   activeView: 'dashboard' | 'annotations' | 'how-to-use';
   onNavigate: (view: 'dashboard' | 'annotations' | 'how-to-use') => void;
   isMobile: boolean;
+  showMobileMenu?: boolean;
+  onCloseMobileMenu?: () => void;
 }
 
 export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   isDarkMode,
   activeView,
   onNavigate,
-  isMobile
+  isMobile,
+  showMobileMenu = false,
+  onCloseMobileMenu = () => {}
 }) => {
   const theme = getTheme(isDarkMode);
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
@@ -69,19 +73,41 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   ];
 
   return (
-    <div
-      style={{
-        width: '280px',
-        backgroundColor: theme.sidebarBg,
-        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
-        borderRight: `1px solid ${theme.border}`,
-        transition: 'all 0.3s ease',
-        display: isMobile ? 'none' : 'block',
-        height: '100vh',
-        overflowY: 'auto',
-        overflowX: 'hidden'
-      }}
-    >
+    <>
+      {/* Overlay for mobile */}
+      {isMobile && showMobileMenu && (
+        <div
+          onClick={onCloseMobileMenu}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 39,
+            display: 'block'
+          }}
+        />
+      )}
+      
+      <div
+        style={{
+          width: '280px',
+          backgroundColor: theme.sidebarBg,
+          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+          borderRight: `1px solid ${theme.border}`,
+          transition: 'all 0.3s ease',
+          display: isMobile ? (showMobileMenu ? 'block' : 'none') : 'block',
+          height: '100vh',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          position: isMobile ? 'fixed' : 'relative',
+          left: isMobile && showMobileMenu ? 0 : (isMobile ? '-280px' : 0),
+          top: isMobile ? '56px' : 0,
+          zIndex: 40
+        }}
+      >
       {/* Logo */}
       <div
         style={{
@@ -128,7 +154,10 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           return (
             <button
               key={index}
-              onClick={item.onClick}
+              onClick={() => {
+                item.onClick();
+                if (isMobile) onCloseMobileMenu();
+              }}
               onMouseEnter={() => setHoveredItem(index)}
               onMouseLeave={() => setHoveredItem(null)}
               style={{
@@ -234,6 +263,6 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           Upgrade Now
         </button>
       </div>
-    </div>
+    </>
   );
 };

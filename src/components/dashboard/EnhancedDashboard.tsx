@@ -257,6 +257,8 @@ const EnhancedDashboard: React.FC = () => {
         activeView={state.activeView}
         onNavigate={handleNavigate}
         isMobile={state.isMobile}
+        showMobileMenu={showMobileMenu}
+        onCloseMobileMenu={() => setShowMobileMenu(false)}
       />
 
       {/* Main Content */}
@@ -286,6 +288,9 @@ const EnhancedDashboard: React.FC = () => {
               onSignIn={() => updateState('showAuthModal', true)}
               onAccessClick={() => updateState('showAccessRequestsModal', true)}
               accessRequestCount={state.accessRequests.length}
+              isMobile={state.isMobile}
+              showMobileMenu={showMobileMenu}
+              onToggleMobileMenu={() => setShowMobileMenu(!showMobileMenu)}
             />
 
             {/* Dashboard Content */}

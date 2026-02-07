@@ -8,7 +8,9 @@ import {
   Code,
   User,
   LogOut,
-  Bell
+  Bell,
+  Menu,
+  X
 } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { getTheme } from '../shared/theme';
@@ -24,6 +26,9 @@ interface DashboardHeaderProps {
   onSignIn: () => void;
   onAccessClick?: () => void;
   accessRequestCount?: number;
+  isMobile?: boolean;
+  showMobileMenu?: boolean;
+  onToggleMobileMenu?: () => void;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
@@ -36,7 +41,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onAILabsClick,
   onSignIn,
   onAccessClick,
-  accessRequestCount = 0
+  accessRequestCount = 0,
+  isMobile = false,
+  showMobileMenu = false,
+  onToggleMobileMenu = () => {}
 }) => {
   const theme = getTheme(isDarkMode);
 
@@ -48,14 +56,37 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 32px',
+        padding: isMobile ? '12px 16px' : '16px 32px',
         position: 'sticky',
         top: 0,
         zIndex: 10
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', color: theme.text, margin: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '24px' }}>
+        {/* Mobile Menu Button */}
+        {isMobile && (
+          <button
+            onClick={onToggleMobileMenu}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: theme.text,
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title="Toggle menu"
+          >
+            {showMobileMenu ? (
+              <X style={{ width: '24px', height: '24px' }} />
+            ) : (
+              <Menu style={{ width: '24px', height: '24px' }} />
+            )}
+          </button>
+        )}
+        <h1 style={{ fontSize: isMobile ? '20px' : '28px', fontWeight: '700', color: theme.text, margin: 0 }}>
           DATTA
         </h1>
       </div>
