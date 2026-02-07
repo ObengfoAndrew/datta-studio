@@ -13,23 +13,36 @@ function getAdminDb() {
       adminDb = getFirestore(apps[0]);
       return adminDb;
     }
+    const rawKey = process.env.FIREBASE_PRIVATE_KEY || '';
+    const containsLiteralEscapes = rawKey.includes('\\n');
+    const hasSurroundingQuotes = rawKey.startsWith('"') && rawKey.endsWith('"');
+    const privateKey = rawKey.replace(/\\n/g, '\n').replace(/^"/, '').replace(/"$/, '');
 
-    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '')
-      .replace(/\\n/g, '\n')
-      .replace(/^"/, '')
-      .replace(/"$/, '');
+    // Diagnostics (do not log the key itself)
+    console.log('Firebase private key diagnostics:', {
+      length: privateKey.length,
+      containsBeginHeader: privateKey.includes('BEGIN PRIVATE KEY'),
+      containsLiteralEscapes,
+      hasSurroundingQuotes,
+    });
 
     if (!privateKey || !privateKey.includes('BEGIN PRIVATE KEY')) {
-      throw new Error('Invalid or missing FIREBASE_PRIVATE_KEY. Please check your .env.local or Netlify environment variables.');
+      throw new Error('Invalid or missing FIREBASE_PRIVATE_KEY. Please check your .env/local or Netlify environment variables.');
     }
 
-    const adminApp = initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey,
-      }),
-    });
+    let adminApp;
+    try {
+      adminApp = initializeApp({
+        credential: cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: privateKey,
+        }),
+      });
+    } catch (initErr) {
+      console.error('Firebase initializeApp error:', initErr && initErr.message ? initErr.message : initErr);
+      throw initErr;
+    }
     adminDb = getFirestore(adminApp);
     return adminDb;
   } catch (error) {
@@ -83,7 +96,7 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('❌ Error creating GitHub user:', error);
+    console.error('❌ Error creating GitHub user:', error, error instanceof Error ? error.stack : undefined);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Failed to create user profile',
