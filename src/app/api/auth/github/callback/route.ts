@@ -22,7 +22,7 @@ export async function GET(request: Request) {
           Common causes:
           <ul>
             <li><strong>redirect_uri_mismatch:</strong> The redirect URL in your code doesn't match GitHub app settings</li>
-            <li>GitHub Authorization callback URL should be: <code>http://localhost:3000/api/auth/github/callback</code></li>
+            <li>GitHub Authorization callback URL should be: <code>https://datta-studio.netlify.app/api/auth/github/callback</code></li>
             <li><a href="https://github.com/settings/developers" target="_blank">Go to GitHub OAuth Apps Settings</a></li>
           </ul>
         </p>

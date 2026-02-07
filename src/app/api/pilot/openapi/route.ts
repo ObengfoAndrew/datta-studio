@@ -10,7 +10,7 @@ export async function GET() {
     },
     servers: [
       { url: "http://localhost:3000", description: "Development" },
-      { url: "https://your-domain.vercel.app", description: "Production" }
+      { url: "https://datta-studio.netlify.app", description: "Production" }
     ],
     security: [{ ApiKeyAuth: [] }],
     paths: {
