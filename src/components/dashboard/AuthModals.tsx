@@ -82,19 +82,29 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
       onClose();
     } catch (error: any) {
       console.error('❌ Google sign-in error:', error);
+      console.error('Error code:', error?.code);
+      console.error('Error message:', error?.message);
       setSignupLoading(false);
 
+      let errorMessage = '';
+      
       if (error?.code === 'auth/popup-closed-by-user') {
-        setSignupError('Sign-in was cancelled. Please try again.');
+        errorMessage = 'Sign-in was cancelled. Please try again.';
       } else if (error?.code === 'auth/popup-blocked') {
-        setSignupError('Popup was blocked. Please allow popups for this site and try again.');
+        errorMessage = 'Popup was blocked. Please allow popups for this site and try again.';
       } else if (error?.code === 'auth/internal-error') {
-        setSignupError('Authentication internal error. Check Firebase configuration and OAuth redirect domains in the Firebase Console.');
+        errorMessage = `Authentication error. This usually means:\n\n1. Check your Firebase Configuration:\n   - Go to Firebase Console > Project Settings\n   - Copy your Web API credentials\n   - Ensure NEXT_PUBLIC_FIREBASE_* env vars are set\n\n2. Add OAuth Redirect Domains:\n   - Firebase Console > Authentication > Settings\n   - Add your current domain: ${typeof window !== 'undefined' ? window.location.hostname : 'your-domain.com'}\n   - Also add: localhost, 127.0.0.1\n\n3. Reload the page after updating Firebase Console`;
       } else if (error?.code === 'auth/unauthorized-domain') {
-        setSignupError('This domain is not authorized for OAuth. Add it to Firebase Console OAuth redirect domains.');
+        errorMessage = `Domain not authorized for OAuth.\n\nFix:\n1. Go to Firebase Console > Authentication > Settings\n2. Under "Authorized domains", add:\n   - ${typeof window !== 'undefined' ? window.location.hostname : 'your-domain.com'}\n   - localhost\n   - 127.0.0.1\n3. Reload this page`;
+      } else if (error?.code === 'auth/invalid-api-key') {
+        errorMessage = 'Invalid Firebase API Key. Check your NEXT_PUBLIC_FIREBASE_API_KEY env var.';
+      } else if (error?.code === 'auth/invalid-user-token') {
+        errorMessage = 'Session expired. Please try again.';
       } else {
-        setSignupError(error?.message || 'Failed to sign in with Google. Please try again.');
+        errorMessage = error?.message || 'Failed to sign in with Google. Please try again.';
       }
+      
+      setSignupError(errorMessage);
     }
   };
 
@@ -188,11 +198,43 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
               window.removeEventListener('message', handleMessage);
             } catch (error: any) {
               console.error('❌ Error creating user profile:', error);
-              setSignupError('Failed to create user profile: ' + error.message);
+              console.error('Error details:', error);
+              
+              let errorMessage = '';
+              if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                errorMessage = `GitHub API Error: Access denied. This usually means:\n\n1. GitHub OAuth App credentials may be invalid:\n   - Check GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET\n   - Verify they're correct in GitHub App Settings\n\n2. Token may have expired:\n   - Try signing in again\n\n3. User account issue:\n   - Ensure your GitHub account is active\n   - Check for 2FA requirements`;
+              } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+                errorMessage = `GitHub API Limit: Rate limited or forbidden. This usually means:\n\n1. GitHub API rate limit exceeded:\n   - Wait a few minutes and try again\n   - Limit is typically 5000/hour for authenticated requests\n\n2. GitHub OAuth App may need approval:\n   - Check GitHub App Settings\n   - Ensure app has required permissions\n\n3. Network connectivity issue:\n   - Check your internet connection`;
+              } else if (error.message.includes('Failed to fetch')) {
+                errorMessage = `Network Error: Cannot reach GitHub API.\n\nThis usually means:\n1. Network connectivity issue:\n   - Check your internet connection\n   - Try disabling VPN if using one\n\n2. GitHub API might be down:\n   - Check GitHub Status: https://www.githubstatus.com\n\n3. Browser privacy settings blocking request:\n   - Check browser's privacy/security settings\n   - Try a different browser`;
+              } else {
+                errorMessage = `Error creating user profile:\n\n${error.message}\n\nThis might be:\n• GitHub API is unreachable\n• User data from GitHub is incomplete\n• Server error processing your account\n\nTry again, or contact support if issue persists`;
+              }
+              
+              setSignupError(errorMessage);
               setSignupLoading(false);
               window.removeEventListener('message', handleMessage);
             }
           })();
+        } else if (event.data.type === 'github-auth-error') {
+          console.error('❌ GitHub OAuth error received:', event.data.error);
+          
+          let errorMessage = '';
+          const errorCode = event.data.error;
+          
+          if (errorCode === 'access_denied') {
+            errorMessage = `GitHub OAuth Denied.\n\nYou clicked "Cancel" or denied permissions.\n\nTo authorize:\n1. Click "Continue with GitHub" again\n2. Click "Authorize" on the GitHub permission screen\n3. Do not click "Cancel"`;
+          } else if (errorCode === 'redirect_uri_mismatch') {
+            errorMessage = `Redirect URI Mismatch.\n\nThe GitHub OAuth redirect is misconfigured.\n\nFix:\n1. Go to GitHub Settings > Developer settings > OAuth Apps\n2. Find your app: "Datta Studio"\n3. Verify "Authorization callback URL" is:\n   ${typeof window !== 'undefined' ? window.location.origin + '/api/auth/github/callback' : 'your-domain.com/api/auth/github/callback'}\n4. Save and try again`;
+          } else if (errorCode === 'invalid_scope') {
+            errorMessage = `GitHub OAuth Scope Error.\n\nThe requested permissions are invalid.\n\nFix:\n1. Check GitHub OAuth App settings\n2. Valid scopes are: repo, read:user, user:email\n3. Contact support if issue persists`;
+          } else {
+            errorMessage = `GitHub OAuth Error: ${errorCode}\n\nThis usually means:\n1. GitHub OAuth is not properly configured\n2. Check GitHub Developer Settings > OAuth Apps\n3. Verify:\n   - Client ID is correct\n   - Client Secret is correct\n   - Authorization callback URL matches\n4. If still failing, create a new OAuth App`;
+          }
+          
+          setSignupError(errorMessage);
+          setSignupLoading(false);
+          window.removeEventListener('message', handleMessage);
         }
       };
 
@@ -202,7 +244,7 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
       const timeout = setTimeout(() => {
         window.removeEventListener('message', handleMessage);
         setSignupLoading(false);
-        setSignupError('GitHub sign-in timed out. Please try again.');
+        setSignupError('GitHub sign-in timed out (5 minutes).\n\nThis usually means:\n1. GitHub OAuth window was left open too long\n2. Network connection was lost\n3. Browser privacy settings blocked the request\n\nTry again and complete sign-in within 5 minutes.');
       }, 5 * 60 * 1000);
 
       // Check if popup was closed
@@ -214,15 +256,25 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
           // Only set error if we didn't already succeed
           if (signupLoading) {
             setSignupLoading(false);
-            setSignupError('Sign-in window was closed. Please try again.');
+            setSignupError('GitHub sign-in window was closed.\n\nThis usually means:\n1. You accidentally closed the popup\n2. Browser privacy settings closed it\n3. Another app blocked the popup\n\nTry again and keep the popup window open until sign-in completes.');
           }
         }
       }, 500);
 
     } catch (error: any) {
       console.error('❌ GitHub sign-in error:', error);
+      console.error('Error code:', error?.code);
+      console.error('Error message:', error?.message);
       setSignupLoading(false);
-      setSignupError(error?.message || 'Failed to sign in with GitHub. Please try again.');
+      
+      let errorMessage = '';
+      if (error?.message?.includes('popup') || error?.message?.includes('Popup')) {
+        errorMessage = `Popup Error.\n\nThe GitHub sign-in popup couldn't be opened.\n\nFix:\n1. Check if popup blocker is enabled\n2. Add this site to popup whitelist\n3. Try a different browser\n4. Disable browser extensions that block popups`;
+      } else {
+        errorMessage = `GitHub Sign-In Error:\n\n${error?.message || 'Unknown error'}\n\nTroubleshooting:\n1. Check your internet connection\n2. Verify GitHub is not down (https://www.githubstatus.com)\n3. Clear browser cache and try again\n4. Try a different browser\n5. Check browser console (F12) for more details`;
+      }
+      
+      setSignupError(errorMessage);
     }
   };
 
@@ -310,9 +362,13 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
               color: '#dc2626',
               padding: '12px 16px',
               borderRadius: '8px',
-              fontSize: '14px',
+              fontSize: '13px',
               marginBottom: '16px',
-              border: '1px solid #fecaca'
+              border: '1px solid #fecaca',
+              textAlign: 'left',
+              whiteSpace: 'pre-wrap',
+              lineHeight: '1.6',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
             }}
           >
             {signupError}

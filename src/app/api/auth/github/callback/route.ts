@@ -13,22 +13,46 @@ export async function GET(request: Request) {
   // Handle GitHub OAuth error responses
   if (error) {
     console.error(`GitHub OAuth Error: ${error} - ${errorDescription}`);
+    
+    // Post error back to parent window for better UI handling
+    const errorPostMessage = `<!DOCTYPE html>
+      <html><body>
+          <script>
+          try {
+            window.opener && window.opener.postMessage({ 
+              type: 'github-auth-error', 
+              error: '${error}',
+              description: '${errorDescription || ''}'
+            }, '*');
+          } catch (e) {}
+            window.close();
+          </script>
+      </body></html>`;
+    
+    // Also show HTML fallback
     const errorHtml = `<!DOCTYPE html>
       <html><body style="font-family: sans-serif; padding: 20px;">
         <h2>GitHub OAuth Error</h2>
         <p><strong>Error:</strong> ${error}</p>
         <p><strong>Details:</strong> ${errorDescription || 'No details provided'}</p>
         <p style="margin-top: 20px; color: #666; font-size: 14px;">
-          Common causes:
+          <strong>Common causes:</strong>
           <ul>
             <li><strong>redirect_uri_mismatch:</strong> The redirect URL in your code doesn't match GitHub app settings</li>
-            <li>GitHub Authorization callback URL should be: <code>https://datta-studio.netlify.app/api/auth/github/callback</code></li>
-            <li><a href="https://github.com/settings/developers" target="_blank">Go to GitHub OAuth Apps Settings</a></li>
+            <li><strong>access_denied:</strong> You clicked "Cancel" instead of "Authorize"</li>
+            <li><strong>invalid_scope:</strong> Invalid permissions requested - try removing and recreating the GitHub app</li>
+          </ul>
+          <p><strong>Fix:</strong></p>
+          <ul>
+            <li>Go to <a href="https://github.com/settings/developers" target="_blank">GitHub OAuth Apps Settings</a></li>
+            <li>Check that "Authorization callback URL" is: <code>${origin}/api/auth/github/callback</code></li>
+            <li>Update if needed and try again</li>
           </ul>
         </p>
         <button onclick="window.close()">Close</button>
       </body></html>`;
-    return new Response(errorHtml, { 
+    
+    return new Response(errorPostMessage + errorHtml, { 
       headers: { 'Content-Type': 'text/html' },
       status: 400
     });
