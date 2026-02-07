@@ -14,11 +14,17 @@ function getAdminDb() {
       return adminDb;
     }
 
+    // Handle both quoted and unquoted private keys
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
+
     const adminApp = initializeApp({
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
     });
     adminDb = getFirestore(adminApp);
