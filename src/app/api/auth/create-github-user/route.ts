@@ -40,7 +40,7 @@ function getAdminDb() {
         }),
       });
     } catch (initErr) {
-      console.error('Firebase initializeApp error:', initErr && initErr.message ? initErr.message : initErr);
+      console.error('Firebase initializeApp error:', initErr instanceof Error ? initErr.message : initErr);
       throw initErr;
     }
     adminDb = getFirestore(adminApp);

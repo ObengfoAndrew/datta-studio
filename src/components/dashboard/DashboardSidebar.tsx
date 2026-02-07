@@ -263,6 +263,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           Upgrade Now
         </button>
       </div>
+      </div>
     </>
   );
 };
