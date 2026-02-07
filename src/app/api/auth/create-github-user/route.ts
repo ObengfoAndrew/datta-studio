@@ -14,17 +14,20 @@ function getAdminDb() {
       return adminDb;
     }
 
-    // Handle both quoted and unquoted private keys
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
-    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-      privateKey = privateKey.slice(1, -1);
+    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '')
+      .replace(/\\n/g, '\n')
+      .replace(/^"/, '')
+      .replace(/"$/, '');
+
+    if (!privateKey || !privateKey.includes('BEGIN PRIVATE KEY')) {
+      throw new Error('Invalid or missing FIREBASE_PRIVATE_KEY. Please check your .env.local or Netlify environment variables.');
     }
 
     const adminApp = initializeApp({
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey.replace(/\\n/g, '\n'),
+        privateKey: privateKey,
       }),
     });
     adminDb = getFirestore(adminApp);
