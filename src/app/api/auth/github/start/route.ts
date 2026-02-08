@@ -11,6 +11,11 @@ export async function GET(request: Request) {
   const { origin } = new URL(request.url);
   const redirectUri = `${origin}/api/auth/github/callback`;
 
+  console.log('🔵 GitHub OAuth Start');
+  console.log('📍 Request origin:', origin);
+  console.log('🔄 Redirect URI being sent to GitHub:', redirectUri);
+  console.log('🔑 Client ID:', GITHUB_CLIENT_ID);
+
   const params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
     redirect_uri: redirectUri,
@@ -19,5 +24,6 @@ export async function GET(request: Request) {
   });
 
   const authUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
+  console.log('🌐 Redirecting to GitHub auth URL:', authUrl);
   return NextResponse.redirect(authUrl);
 }
