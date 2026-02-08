@@ -18,7 +18,7 @@ interface Repository {
 
 interface RepositoryListProps {
   repos: Repository[];
-  provider: 'github' | 'gitlab';
+  provider: 'github' | 'gitlab' | 'bitbucket';
   isDarkMode: boolean;
   onSelectRepo: (repo: Repository) => void;
   onSelectMultiple?: (repos: Repository[]) => void;
