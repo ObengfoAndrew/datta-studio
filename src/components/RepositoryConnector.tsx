@@ -59,7 +59,7 @@ const RepositoryConnector: React.FC<RepositoryConnectorProps> = ({
           name: 'GitHub',
           icon: '🔗',
           clientId: process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || '',
-          redirectUri: `${window.location.origin}/auth/github/callback`,
+          redirectUri: `${window.location.origin}/api/auth/github/callback`,
           authUrl: 'https://github.com/login/oauth/authorize',
           scopes: ['repo', 'user'],
         };
@@ -68,7 +68,7 @@ const RepositoryConnector: React.FC<RepositoryConnectorProps> = ({
           name: 'GitLab',
           icon: '🦊',
           clientId: process.env.NEXT_PUBLIC_GITLAB_CLIENT_ID || '',
-          redirectUri: `${window.location.origin}/auth/gitlab/callback`,
+          redirectUri: `${window.location.origin}/api/auth/gitlab/callback`,
           authUrl: 'https://gitlab.com/oauth/authorize',
           scopes: ['api', 'read_user', 'read_repository'],
         };
@@ -77,7 +77,7 @@ const RepositoryConnector: React.FC<RepositoryConnectorProps> = ({
           name: 'Bitbucket',
           icon: '🪣',
           clientId: process.env.NEXT_PUBLIC_BITBUCKET_CLIENT_ID || '',
-          redirectUri: `${window.location.origin}/auth/bitbucket/callback`,
+          redirectUri: `${window.location.origin}/api/auth/bitbucket/callback`,
           authUrl: 'https://bitbucket.org/site/oauth2/authorize',
           scopes: ['repository'],
         };
