@@ -147,14 +147,14 @@ async function getCachedPublicDatasets(db: any, bypassCache: boolean = false): P
  * GET /api/pilot/datasets/public
  * List all published datasets (PUBLIC - no authentication required)
  * Query Parameters:
- *   - limit: Number of datasets to return (default: 20, max: 100)
+ *   - limit: Number of datasets to return (default: 100, max: 500)
  *   - offset: Pagination offset (default: 0)
  *   - nocache: Set to "1" to bypass cache and fetch fresh data
  */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20'), 1), 100);
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '100'), 1), 500);
     const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
     const bypassCache = searchParams.get('nocache') === '1';
 
