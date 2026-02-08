@@ -70,8 +70,9 @@ export const AILabsModal: React.FC<AILabsModalProps> = ({
       setLoadingDatasets(true);
       console.log('📊 Fetching all published datasets for modal');
       
-      // Fetch all published datasets from the public API endpoint
-      const response = await fetch('/api/pilot/datasets/public');
+      // Fetch all published datasets from the public API endpoint with cache bypass
+      // to get fresh data after code updates
+      const response = await fetch('/api/pilot/datasets/public?nocache=1');
       console.log('API Response status:', response.status);
       
       if (!response.ok) {

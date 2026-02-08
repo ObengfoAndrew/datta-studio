@@ -36,11 +36,11 @@ let cachedPublicDatasets: any[] = [];
 let cacheTimestamp: number = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function getCachedPublicDatasets(db: any): Promise<any[]> {
+async function getCachedPublicDatasets(db: any, bypassCache: boolean = false): Promise<any[]> {
   const now = Date.now();
   
-  // Return cached results if still valid
-  if (cachedPublicDatasets.length > 0 && now - cacheTimestamp < CACHE_TTL) {
+  // Return cached results if still valid (unless cache is bypassed)
+  if (!bypassCache && cachedPublicDatasets.length > 0 && now - cacheTimestamp < CACHE_TTL) {
     console.log(`📦 Returning cached ${cachedPublicDatasets.length} datasets`);
     return cachedPublicDatasets;
   }
@@ -149,17 +149,26 @@ async function getCachedPublicDatasets(db: any): Promise<any[]> {
  * Query Parameters:
  *   - limit: Number of datasets to return (default: 20, max: 100)
  *   - offset: Pagination offset (default: 0)
+ *   - nocache: Set to "1" to bypass cache and fetch fresh data
  */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20'), 1), 100);
     const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
+    const bypassCache = searchParams.get('nocache') === '1';
 
     const db = getAdminDb();
     
-    // Get datasets from cache
-    const allDatasets = await getCachedPublicDatasets(db);
+    if (bypassCache) {
+      console.log('🔄 Cache bypass requested - fetching fresh datasets');
+      // Clear cache to force fresh fetch
+      cachedPublicDatasets = [];
+      cacheTimestamp = 0;
+    }
+    
+    // Get datasets from cache (or fetch fresh if cache bypass requested)
+    const allDatasets = await getCachedPublicDatasets(db, bypassCache);
 
     // Apply pagination
     const paginatedDatasets = allDatasets.slice(offset, offset + limit);
