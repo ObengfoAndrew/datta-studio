@@ -57,14 +57,21 @@ export async function GET(request: NextRequest) {
     
     for (const userDoc of usersSnapshot.docs) {
       const datasetsRef = collection(userDoc.ref, 'datasets');
-      const q = query(datasetsRef, where('status', '==', 'published'));
-      const datasetsSnapshot = await getDocs(q);
+      // Fetch all datasets and filter in code to include published and datasets without status
+      const datasetsSnapshot = await getDocs(datasetsRef);
 
       datasetsSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        // Include datasets that are published OR don't have a status field (treat as published)
+        // Only exclude datasets with explicit 'draft' status
+        if (data.status && data.status !== 'published' && data.status !== 'uploaded') {
+          return;
+        }
+        
         allDatasets.push({
           userId: userDoc.id,
           id: doc.id,
-          ...doc.data(),
+          ...data,
         });
       });
     }

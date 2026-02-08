@@ -70,19 +70,25 @@ async function getCachedPublicDatasets(db: any): Promise<any[]> {
       // Fetch all datasets for batch users in parallel
       const batchPromises = batch.map(async (userId) => {
         try {
+          // Fetch all datasets (no where clause) and filter in code to include published and datasets without status
           const datasetsSnapshot = await db
             .collection('users')
             .doc(userId)
             .collection('datasets')
-            .where('status', '==', 'published')
             .orderBy('dateAdded', 'desc')
-            .limit(10) // Limit per user to avoid fetching too much
+            .limit(20) // Increased limit since we'll filter
             .get();
           
           const userDatasets: any[] = [];
           datasetsSnapshot.forEach((d: any) => {
             const data = d.data();
             if (data.title === 'Test Dataset' || data.sourceName === 'Test Dataset') return;
+            
+            // Include datasets that are published OR don't have a status field (treat as published)
+            // Only exclude datasets with explicit 'draft' status
+            if (data.status && data.status !== 'published' && data.status !== 'uploaded') {
+              return;
+            }
             
             userDatasets.push({
               id: d.id,
