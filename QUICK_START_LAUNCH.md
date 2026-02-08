@@ -37,7 +37,7 @@ NEXT_PUBLIC_GITHUB_CLIENT_ID=your_github_client_id
 **Update `src/lib/firebase.ts`:**
 ```typescript
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAreBHijkdhcy-HHHP8rNQDzY3J0Nej3kA",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "YOUR_FIREBASE_API_KEY_HERE",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "datta-dattawallet.firebaseapp.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "datta-dattawallet",
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "datta-dattawallet.firebasestorage.app",

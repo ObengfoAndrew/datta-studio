@@ -195,7 +195,7 @@ Display to user with troubleshooting
 
 ```dotenv
 # Firebase (Google Sign-In)
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAreBHijkdhcy-HHHP8rNQDzY3J0Nej3kA
+NEXT_PUBLIC_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY_HERE
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=datta-dattawallet.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=datta-dattawallet
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=datta-dattawallet.firebasestorage.app
