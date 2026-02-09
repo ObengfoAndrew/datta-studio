@@ -66,8 +66,8 @@ export function getOwnerNotificationEmail(
 ): EmailPayload {
   const dashboardUrl = process.env.DATTA_DASHBOARD_URL!;
   const reviewUrl = datasetId 
-    ? `${dashboardUrl}/dashboard?tab=accessRequests&requestId=${requestId}&datasetId=${datasetId}`
-    : `${dashboardUrl}/dashboard?tab=accessRequests&requestId=${requestId}`;
+    ? `${dashboardUrl}?tab=accessRequests&requestId=${requestId}&datasetId=${datasetId}`
+    : `${dashboardUrl}?tab=accessRequests&requestId=${requestId}`;
   return {
     to: ownerEmail,
     subject: `📊 New Dataset Access Request: ${datasetTitle}`,
