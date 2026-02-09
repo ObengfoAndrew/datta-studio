@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, addDoc } from 'firebase/firestore';
 import { getDatasets } from '@/lib/datasetService';
 import { getApiKeyEmail, getRejectionEmail } from '@/lib/emailService';
 import { DashboardHeader } from './DashboardHeader';
@@ -390,7 +390,7 @@ const EnhancedDashboard: React.FC = () => {
         onClose={() => updateState('showAddSourceModal', false)}
         currentUser={state.currentUser}
         onDatasetAdded={(sourceType: SourceType, licenseType: LicenseType, file?: File, sourceProvider?: string) => {
-          if (file) {
+          if (file && state.currentUser) {
             // Create a new dataset from the uploaded file
             const newDataset: Dataset = {
               id: `ds-${Date.now()}`,
@@ -411,6 +411,33 @@ const EnhancedDashboard: React.FC = () => {
             // Add to datasets
             const updatedDatasets = [...state.datasets, newDataset];
             updateState('datasets', updatedDatasets);
+
+            // Persist dataset to Firestore so it appears in AI Labs
+            (async () => {
+              try {
+                if (!db) {
+                  console.error('❌ Firestore database not initialized');
+                  return;
+                }
+                const userDocRef = doc(db, 'users', state.currentUser!.uid);
+                const datasetsCollectionRef = collection(userDocRef, 'datasets');
+                await addDoc(datasetsCollectionRef, {
+                  id: newDataset.id,
+                  title: newDataset.title,
+                  sourceName: newDataset.sourceName,
+                  sourceType: newDataset.sourceType,
+                  licenseType: newDataset.licenseType,
+                  fileSize: newDataset.fileSize,
+                  status: newDataset.status,
+                  downloads: newDataset.downloads,
+                  dateAdded: newDataset.dateAdded,
+                  metadata: newDataset.metadata
+                });
+                console.log('✅ Dataset saved to Firestore');
+              } catch (error) {
+                console.error('❌ Error saving dataset to Firestore:', error);
+              }
+            })();
 
             // Create a data source from the uploaded file and add to dataSources
             const newDataSource: DataSource = {
