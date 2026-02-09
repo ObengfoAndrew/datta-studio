@@ -23,10 +23,9 @@ const AddDataSourceModal: React.FC<AddDataSourceModalProps> = ({
   onDatasetAdded,
   currentUser,
 }) => {
-  const [activeTab, setActiveTab] = useState<SourceType>('code');
   const [showLicenseModal, setShowLicenseModal] = useState(false);
   const [showRepositoryConnector, setShowRepositoryConnector] = useState(false);
-  const [pendingSourceType, setPendingSourceType] = useState<SourceType | null>(null);
+  const [pendingSourceType, setPendingSourceType] = useState<SourceType>('code');
   const [pendingSourceProvider, setPendingSourceProvider] = useState<string | null>(null);
   const [pendingLicenseType, setPendingLicenseType] = useState<LicenseType | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -95,13 +94,8 @@ const AddDataSourceModal: React.FC<AddDataSourceModalProps> = ({
     },
   ];
 
-  const sourceMap: Record<SourceType, SourceDefinition[]> = {
-    code: codeSources,
-    art: codeSources, // Not used, but kept for type compatibility
-    voice: codeSources, // Not used, but kept for type compatibility
-  };
-
-  const currentSources = sourceMap[activeTab];
+  // Code datasets only - simplified
+  const currentSources = codeSources;
 
   // Define valid code file extensions and MIME types
   const VALID_CODE_EXTENSIONS = [
@@ -207,7 +201,10 @@ const AddDataSourceModal: React.FC<AddDataSourceModalProps> = ({
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && pendingSourceType) {
+    if (file) {
+      // Always code for uploads
+      setPendingSourceType('code');
+      
       // Validate that the file is a code file
       if (!isValidCodeFile(file)) {
         const fileName = file.name.toLowerCase();
@@ -489,13 +486,7 @@ const AddDataSourceModal: React.FC<AddDataSourceModalProps> = ({
             type="file"
             onChange={handleFileSelected}
             style={{ display: 'none' }}
-            accept={
-              activeTab === 'code'
-                ? '.zip,.tar,.gz,.tar.gz,.py,.js,.ts,.tsx,.jsx,.java,.cpp,.c,.go,.rb,.php,.cs,.swift,.kotlin,.scala,.json,.xml,.yaml,.yml,.html,.css,.scss,.sass,.sql,.sh,.bash,.zsh,.md,.txt,.conf,.config'
-                : activeTab === 'art'
-                  ? '.png,.jpg,.jpeg,.psd,.svg,.ai,.gif'
-                  : '.wav,.mp3,.m4a,.flac,.aac,.webm'
-            }
+            accept=".zip,.tar,.gz,.tar.gz,.py,.js,.ts,.tsx,.jsx,.java,.cpp,.c,.go,.rb,.php,.cs,.swift,.kotlin,.scala,.json,.xml,.yaml,.yml,.html,.css,.scss,.sass,.sql,.sh,.bash,.zsh,.md,.txt,.conf,.config"
           />
 
           <style>{`
