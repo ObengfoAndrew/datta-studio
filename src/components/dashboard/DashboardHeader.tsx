@@ -72,12 +72,21 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               border: 'none',
               cursor: 'pointer',
               color: theme.text,
-              padding: '4px',
+              padding: '8px 12px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              borderRadius: '8px',
+              transition: 'all 0.2s ease',
+              hover: { backgroundColor: theme.border }
             }}
             title="Toggle menu"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.border;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             {showMobileMenu ? (
               <X style={{ width: '24px', height: '24px' }} />
@@ -92,36 +101,38 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {/* Search Bar */}
-        <div style={{ position: 'relative' }}>
-          <Search
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: '16px',
-              height: '16px',
-              color: theme.textSecondary
-            }}
-          />
-          <input
-            type="text"
-            placeholder="Search..."
-            style={{
-              paddingLeft: '36px',
-              paddingRight: '12px',
-              paddingTop: '8px',
-              paddingBottom: '8px',
-              border: `1px solid ${theme.border}`,
-              borderRadius: '8px',
-              fontSize: '14px',
-              backgroundColor: theme.searchBg,
-              width: '200px',
-              color: theme.text
-            }}
-          />
-        </div>
+        {/* Search Bar - Hide on mobile */}
+        {!isMobile && (
+          <div style={{ position: 'relative' }}>
+            <Search
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '16px',
+                height: '16px',
+                color: theme.textSecondary
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search..."
+              style={{
+                paddingLeft: '36px',
+                paddingRight: '12px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                border: `1px solid ${theme.border}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                backgroundColor: theme.searchBg,
+                width: '200px',
+                color: theme.text
+              }}
+            />
+          </div>
+        )}
 
         {/* Access Tab Button */}
         {isAuthenticated && (
