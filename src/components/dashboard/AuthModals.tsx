@@ -3,7 +3,6 @@
 'use client'
 
 import React, { useState } from 'react';
-import { Github } from 'lucide-react';
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -108,175 +107,7 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
     }
   };
 
-  // GitHub Sign In Handler - Using custom OAuth popup instead of Firebase provider
-  const handleGithubSignIn = async () => {
-    try {
-      console.log('🔐 GitHub sign-in initiated via custom OAuth flow...');
-      setSignupLoading(true);
-      setSignupError('');
 
-      // Open GitHub OAuth in a popup window
-      const popupWidth = 500;
-      const popupHeight = 600;
-      const popupLeft = window.screenX + (window.outerWidth - popupWidth) / 2;
-      const popupTop = window.screenY + (window.outerHeight - popupHeight) / 2;
-
-      const popup = window.open(
-        '/api/auth/github/start',
-        'github-auth',
-        `width=${popupWidth},height=${popupHeight},left=${popupLeft},top=${popupTop}`
-      );
-
-      if (!popup) {
-        setSignupLoading(false);
-        setSignupError('Popup blocked. Please allow popups for this site.');
-        return;
-      }
-
-      // Wait for postMessage from GitHub callback
-      const handleMessage = (event: MessageEvent) => {
-        // Validate origin for security
-        if (event.origin !== window.location.origin) return;
-
-        if (event.data.type === 'github-auth-success') {
-          console.log('✅ GitHub OAuth callback received');
-          const { user: githubUser, repos } = event.data.data;
-
-          // Create user profile via API with admin permissions
-          (async () => {
-            try {
-              const createUserResponse = await fetch('/api/auth/create-github-user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: githubUser.id.toString(),
-                  email: githubUser.email || `${githubUser.login}@github.com`,
-                  displayName: githubUser.name || githubUser.login,
-                  photoURL: githubUser.avatar_url,
-                  githubLogin: githubUser.login
-                })
-              });
-
-              if (!createUserResponse.ok) {
-                const errorData = await createUserResponse.json();
-                throw new Error(errorData.error || 'Failed to create user profile');
-              }
-
-              console.log('✅ User profile created via API');
-
-              // Create a mock Firebase User object from GitHub data for local state
-              const mockUser = {
-                uid: githubUser.id.toString(),
-                email: githubUser.email || `${githubUser.login}@github.com`,
-                displayName: githubUser.name || githubUser.login,
-                photoURL: githubUser.avatar_url,
-                metadata: {
-                  creationTime: new Date().toISOString(),
-                  lastSignInTime: new Date().toISOString()
-                },
-                isAnonymous: false,
-                emailVerified: !!githubUser.email,
-                providerData: [{
-                  uid: githubUser.id.toString(),
-                  displayName: githubUser.name || githubUser.login,
-                  photoURL: githubUser.avatar_url,
-                  email: githubUser.email || `${githubUser.login}@github.com`,
-                  phoneNumber: null,
-                  providerId: 'github.com'
-                }],
-                getIdToken: async () => 'github-' + githubUser.id,
-                getIdTokenResult: async () => ({ token: 'github-' + githubUser.id }),
-                reload: async () => {},
-                delete: async () => {},
-                toJSON: () => ({})
-              } as unknown as FirebaseUser;
-
-              setSignupError('');
-              setSignupLoading(false);
-              onAuthSuccess(mockUser);
-              onClose();
-              window.removeEventListener('message', handleMessage);
-            } catch (error: any) {
-              console.error('❌ Error creating user profile:', error);
-              console.error('Error details:', error);
-              
-              let errorMessage = '';
-              if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-                errorMessage = `GitHub API Error: Access denied. This usually means:\n\n1. GitHub OAuth App credentials may be invalid:\n   - Check GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET\n   - Verify they're correct in GitHub App Settings\n\n2. Token may have expired:\n   - Try signing in again\n\n3. User account issue:\n   - Ensure your GitHub account is active\n   - Check for 2FA requirements`;
-              } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
-                errorMessage = `GitHub API Limit: Rate limited or forbidden. This usually means:\n\n1. GitHub API rate limit exceeded:\n   - Wait a few minutes and try again\n   - Limit is typically 5000/hour for authenticated requests\n\n2. GitHub OAuth App may need approval:\n   - Check GitHub App Settings\n   - Ensure app has required permissions\n\n3. Network connectivity issue:\n   - Check your internet connection`;
-              } else if (error.message.includes('Failed to fetch')) {
-                errorMessage = `Network Error: Cannot reach GitHub API.\n\nThis usually means:\n1. Network connectivity issue:\n   - Check your internet connection\n   - Try disabling VPN if using one\n\n2. GitHub API might be down:\n   - Check GitHub Status: https://www.githubstatus.com\n\n3. Browser privacy settings blocking request:\n   - Check browser's privacy/security settings\n   - Try a different browser`;
-              } else {
-                errorMessage = `Error creating user profile:\n\n${error.message}\n\nThis might be:\n• GitHub API is unreachable\n• User data from GitHub is incomplete\n• Server error processing your account\n\nTry again, or contact support if issue persists`;
-              }
-              
-              setSignupError(errorMessage);
-              setSignupLoading(false);
-              window.removeEventListener('message', handleMessage);
-            }
-          })();
-        } else if (event.data.type === 'github-auth-error') {
-          console.error('❌ GitHub OAuth error received:', event.data.error);
-          
-          let errorMessage = '';
-          const errorCode = event.data.error;
-          
-          if (errorCode === 'access_denied') {
-            errorMessage = `GitHub OAuth Denied.\n\nYou clicked "Cancel" or denied permissions.\n\nTo authorize:\n1. Click "Continue with GitHub" again\n2. Click "Authorize" on the GitHub permission screen\n3. Do not click "Cancel"`;
-          } else if (errorCode === 'redirect_uri_mismatch') {
-            errorMessage = `Redirect URI Mismatch.\n\nThe GitHub OAuth redirect is misconfigured.\n\nFix:\n1. Go to GitHub Settings > Developer settings > OAuth Apps\n2. Find your app: "Datta Studio"\n3. Verify "Authorization callback URL" is:\n   ${typeof window !== 'undefined' ? window.location.origin + '/api/auth/github/callback' : 'your-domain.com/api/auth/github/callback'}\n4. Save and try again`;
-          } else if (errorCode === 'invalid_scope') {
-            errorMessage = `GitHub OAuth Scope Error.\n\nThe requested permissions are invalid.\n\nFix:\n1. Check GitHub OAuth App settings\n2. Valid scopes are: repo, read:user, user:email\n3. Contact support if issue persists`;
-          } else {
-            errorMessage = `GitHub OAuth Error: ${errorCode}\n\nThis usually means:\n1. GitHub OAuth is not properly configured\n2. Check GitHub Developer Settings > OAuth Apps\n3. Verify:\n   - Client ID is correct\n   - Client Secret is correct\n   - Authorization callback URL matches\n4. If still failing, create a new OAuth App`;
-          }
-          
-          setSignupError(errorMessage);
-          setSignupLoading(false);
-          window.removeEventListener('message', handleMessage);
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
-
-      // Timeout after 5 minutes
-      const timeout = setTimeout(() => {
-        window.removeEventListener('message', handleMessage);
-        setSignupLoading(false);
-        setSignupError('GitHub sign-in timed out (5 minutes).\n\nThis usually means:\n1. GitHub OAuth window was left open too long\n2. Network connection was lost\n3. Browser privacy settings blocked the request\n\nTry again and complete sign-in within 5 minutes.');
-      }, 5 * 60 * 1000);
-
-      // Check if popup was closed
-      const popupCheckInterval = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(popupCheckInterval);
-          clearTimeout(timeout);
-          window.removeEventListener('message', handleMessage);
-          // Only set error if we didn't already succeed
-          if (signupLoading) {
-            setSignupLoading(false);
-            setSignupError('GitHub sign-in window was closed.\n\nThis usually means:\n1. You accidentally closed the popup\n2. Browser privacy settings closed it\n3. Another app blocked the popup\n\nTry again and keep the popup window open until sign-in completes.');
-          }
-        }
-      }, 500);
-
-    } catch (error: any) {
-      console.error('❌ GitHub sign-in error:', error);
-      console.error('Error code:', error?.code);
-      console.error('Error message:', error?.message);
-      setSignupLoading(false);
-      
-      let errorMessage = '';
-      if (error?.message?.includes('popup') || error?.message?.includes('Popup')) {
-        errorMessage = `Popup Error.\n\nThe GitHub sign-in popup couldn't be opened.\n\nFix:\n1. Check if popup blocker is enabled\n2. Add this site to popup whitelist\n3. Try a different browser\n4. Disable browser extensions that block popups`;
-      } else {
-        errorMessage = `GitHub Sign-In Error:\n\n${error?.message || 'Unknown error'}\n\nTroubleshooting:\n1. Check your internet connection\n2. Verify GitHub is not down (https://www.githubstatus.com)\n3. Clear browser cache and try again\n4. Try a different browser\n5. Check browser console (F12) for more details`;
-      }
-      
-      setSignupError(errorMessage);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -396,7 +227,7 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
             transition: 'all 0.2s',
             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
             opacity: signupLoading ? 0.7 : 1,
-            marginBottom: '12px'
+            marginBottom: '16px'
           }}
           onMouseEnter={(e) => {
             if (!signupLoading) {
@@ -418,43 +249,7 @@ export const AuthModals: React.FC<AuthModalsProps> = ({
           Continue with Google
         </button>
 
-        {/* GitHub Sign-in Button */}
-        <button
-          onClick={handleGithubSignIn}
-          disabled={signupLoading}
-          style={{
-            width: '100%',
-            backgroundColor: signupLoading ? '#f5f5f5' : (isDarkMode ? '#1f2937' : '#000000'),
-            color: 'white',
-            border: '1px solid #374151',
-            borderRadius: '12px',
-            padding: '14px 16px',
-            fontSize: '16px',
-            fontWeight: '600',
-            cursor: signupLoading ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '12px',
-            transition: 'all 0.2s',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-            opacity: signupLoading ? 0.7 : 1,
-            marginBottom: '12px'
-          }}
-          onMouseEnter={(e) => {
-            if (!signupLoading) {
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          <Github style={{ width: '20px', height: '20px' }} />
-          Continue with GitHub
-        </button>
+
 
         {/* Footer */}
         <p

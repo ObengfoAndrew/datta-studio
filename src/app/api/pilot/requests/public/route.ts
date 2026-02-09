@@ -133,7 +133,8 @@ export async function POST(request: NextRequest) {
             company,
             datasetData.title || datasetData.sourceName || 'Unknown Dataset',
             purpose,
-            requestDocRef.id
+            requestDocRef.id,
+            datasetId
           );
           
           const ownerEmailSent = await sendEmail(ownerEmailPayload);

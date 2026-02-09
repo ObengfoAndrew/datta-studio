@@ -12,6 +12,7 @@ interface AccessRequestsModalProps {
   requests: AccessRequest[];
   onApprove: (requestId: string) => Promise<void>;
   onReject: (requestId: string) => Promise<void>;
+  selectedRequestId?: string;
 }
 
 export const AccessRequestsModal: React.FC<AccessRequestsModalProps> = ({
@@ -21,6 +22,7 @@ export const AccessRequestsModal: React.FC<AccessRequestsModalProps> = ({
   requests,
   onApprove,
   onReject,
+  selectedRequestId,
 }) => {
   const theme = getTheme(isDarkMode);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -129,9 +131,14 @@ export const AccessRequestsModal: React.FC<AccessRequestsModalProps> = ({
                         key={request.id}
                         style={{
                           padding: '16px',
-                          backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+                          backgroundColor: request.id === selectedRequestId 
+                            ? (isDarkMode ? '#1e3a3a' : '#d1fae5')
+                            : (isDarkMode ? '#1e293b' : '#f8fafc'),
                           borderRadius: '8px',
-                          border: `1px solid ${theme.border}`
+                          border: request.id === selectedRequestId
+                            ? '2px solid #10b981'
+                            : `1px solid ${theme.border}`,
+                          transition: 'all 0.2s'
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>

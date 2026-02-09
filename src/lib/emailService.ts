@@ -61,8 +61,13 @@ export function getOwnerNotificationEmail(
   requesterCompany: string,
   datasetTitle: string,
   purpose: string,
-  requestId: string
+  requestId: string,
+  datasetId?: string
 ): EmailPayload {
+  const dashboardUrl = process.env.DATTA_DASHBOARD_URL || 'https://datta.ai';
+  const reviewUrl = datasetId 
+    ? `${dashboardUrl}/dashboard?tab=accessRequests&requestId=${requestId}&datasetId=${datasetId}`
+    : `${dashboardUrl}/dashboard?tab=accessRequests&requestId=${requestId}`;
   return {
     to: ownerEmail,
     subject: `📊 New Dataset Access Request: ${datasetTitle}`,
@@ -84,7 +89,7 @@ export function getOwnerNotificationEmail(
         </p>
 
         <div style="text-align: center; margin-top: 30px;">
-          <a href="${process.env.DATTA_DASHBOARD_URL || 'https://datta.ai'}/dashboard" 
+          <a href="${reviewUrl}"
              style="display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">
             Review Request in Dashboard
           </a>

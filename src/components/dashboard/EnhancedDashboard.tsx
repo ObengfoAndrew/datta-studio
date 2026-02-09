@@ -49,6 +49,7 @@ interface EnhancedDashboardState {
   }>;
   walletFolders: string[];
   accessRequests: AccessRequest[];
+  selectedRequestId?: string;
 }
 
 const EnhancedDashboard: React.FC = () => {
@@ -71,7 +72,8 @@ const EnhancedDashboard: React.FC = () => {
     datasets: [],
     uploadedFiles: [],
     walletFolders: [],
-    accessRequests: []
+    accessRequests: [],
+    selectedRequestId: undefined
   });
 
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -91,6 +93,21 @@ const EnhancedDashboard: React.FC = () => {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Handle URL parameters for direct access request review
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const requestId = params.get('requestId');
+      const datasetId = params.get('datasetId');
+      
+      if (requestId) {
+        updateState('selectedRequestId', requestId);
+        // Auto-open the access requests modal when document is ready
+        // The modal will open after data is loaded
+      }
+    }
   }, []);
 
   // Firebase Auth State
@@ -199,6 +216,20 @@ const EnhancedDashboard: React.FC = () => {
       fetchUserData();
     }
   }, [state.currentUser?.uid]);
+
+  // Auto-open access requests modal when URL has requestId parameter and data is loaded
+  useEffect(() => {
+    if (state.selectedRequestId && state.accessRequests.length > 0) {
+      const requestExists = state.accessRequests.some(r => r.id === state.selectedRequestId);
+      if (requestExists) {
+        updateState('showAccessRequestsModal', true);
+        // Clean up URL params after opening modal
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, document.title, '/dashboard');
+        }
+      }
+    }
+  }, [state.selectedRequestId, state.accessRequests]);
 
   const handleToggleTheme = () => {
     updateState('isDarkMode', !state.isDarkMode);
@@ -418,6 +449,7 @@ const EnhancedDashboard: React.FC = () => {
         isDarkMode={state.isDarkMode}
         onClose={() => updateState('showAccessRequestsModal', false)}
         requests={state.accessRequests}
+        selectedRequestId={state.selectedRequestId}
         onApprove={async (requestId: string) => {
           try {
             // Find the request to get requester details
