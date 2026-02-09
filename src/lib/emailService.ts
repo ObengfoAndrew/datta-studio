@@ -64,7 +64,7 @@ export function getOwnerNotificationEmail(
   requestId: string,
   datasetId?: string
 ): EmailPayload {
-  const dashboardUrl = process.env.DATTA_DASHBOARD_URL || 'https://datta.ai';
+  const dashboardUrl = process.env.DATTA_DASHBOARD_URL!;
   const reviewUrl = datasetId 
     ? `${dashboardUrl}/dashboard?tab=accessRequests&requestId=${requestId}&datasetId=${datasetId}`
     : `${dashboardUrl}/dashboard?tab=accessRequests&requestId=${requestId}`;
