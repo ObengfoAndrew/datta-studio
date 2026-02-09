@@ -412,6 +412,17 @@ const EnhancedDashboard: React.FC = () => {
             const updatedDatasets = [...state.datasets, newDataset];
             updateState('datasets', updatedDatasets);
 
+            // Create a data source from the uploaded file and add to dataSources
+            const newDataSource: DataSource = {
+              name: file.name.replace(/\.[^/.]+$/, ''),
+              icon: sourceType === 'code' ? '💻' : sourceType === 'art' ? '🎨' : '🎙️',
+              status: 'Connected',
+              lastSync: new Date().toLocaleString(),
+              dataSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`
+            };
+            const updatedDataSources = [...state.dataSources, newDataSource];
+            updateState('dataSources', updatedDataSources);
+
             // Add to uploaded files with proper structure for Data Wallet
             const newUploadedFile = {
               id: `file-${Date.now()}`,
