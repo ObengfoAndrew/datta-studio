@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, addDoc, setDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, setDoc, doc, getDocs, query, orderBy, limit as firestoreLimit } from 'firebase/firestore';
 
 // Helper function to ensure db is initialized
 function ensureDb() {
@@ -345,4 +345,122 @@ export async function saveConnectedSource(
     console.error('Error saving connected source:', error);
     throw error;
   }
+}
+
+/**
+ * Save activity to Firestore for persistent tracking
+ */
+export async function saveActivity(
+  userId: string,
+  action: string,
+  type: string,
+  icon: string
+) {
+  try {
+    const activitiesRef = collection(ensureDb(), 'users', userId, 'activities');
+    
+    // Add activity with server timestamp for accurate ordering
+    const docRef = await addDoc(activitiesRef, {
+      action,
+      type,
+      icon,
+      createdAt: new Date().toISOString(),
+      timestamp: new Date().getTime()
+    });
+    
+    console.log('✅ Activity saved:', action);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error saving activity:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get recent activity from Firestore
+ */
+export async function getActivity(userId: string, limit: number = 10) {
+  try {
+    const activitiesRef = collection(ensureDb(), 'users', userId, 'activities');
+    
+    const q = query(
+      activitiesRef,
+      orderBy('timestamp', 'desc'),
+      firestoreLimit(limit)
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    const activities = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        action: data.action,
+        type: data.type,
+        icon: data.icon,
+        time: formatTimeAgo(new Date(data.createdAt)),
+        createdAt: data.createdAt
+      };
+    });
+    
+    console.log(`✅ Loaded ${activities.length} activities from Firestore`);
+    return activities;
+  } catch (error) {
+    console.error('Error fetching activities:', error);
+    return [];
+  }
+}
+
+/**
+ * Get all data sources (connected sources converted to DataSource format)
+ */
+export async function getDataSources(userId: string) {
+  try {
+    const sourcesRef = collection(ensureDb(), 'users', userId, 'connectedSources');
+    const snapshot = await getDocs(sourcesRef);
+    
+    const dataSources: any[] = [];
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const providerName = data.provider === 'github' ? 'GitHub' : 
+                          data.provider === 'gitlab' ? 'GitLab' : 
+                          'Bitbucket';
+      
+      const providerIcon = data.provider === 'github' ? '🔗' :
+                          data.provider === 'gitlab' ? '🦊' :
+                          '📦';
+      
+      dataSources.push({
+        name: `${providerName} (${data.userData?.login || data.userData?.username || 'Connected'})`,
+        icon: providerIcon,
+        status: data.isActive ? 'Connected' : 'Disconnected',
+        lastSync: new Date(data.connectedAt).toLocaleString(),
+        dataSize: data.userData?.public_repos ? `${data.userData.public_repos} repos` : 'Unknown',
+        provider: data.provider
+      });
+    });
+    
+    console.log(`✅ Loaded ${dataSources.length} data sources`);
+    return dataSources;
+  } catch (error) {
+    console.error('Error fetching data sources:', error);
+    return [];
+  }
+}
+
+/**
+ * Helper function to format time ago
+ */
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const secondsAgo = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (secondsAgo < 60) return 'Just now';
+  const minutesAgo = Math.floor(secondsAgo / 60);
+  if (minutesAgo < 60) return `${minutesAgo}m ago`;
+  const hoursAgo = Math.floor(minutesAgo / 60);
+  if (hoursAgo < 24) return `${hoursAgo}h ago`;
+  const daysAgo = Math.floor(hoursAgo / 24);
+  return `${daysAgo}d ago`;
 }

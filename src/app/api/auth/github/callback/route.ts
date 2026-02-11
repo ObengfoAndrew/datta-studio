@@ -257,7 +257,7 @@ export async function GET(request: Request) {
           try {
             window.opener && window.opener.postMessage({ type: 'github-auth-success', data: { user: ${JSON.stringify(
               userData
-            )}, repos: ${JSON.stringify(reposData)} } }, '*');
+            )}, repos: ${JSON.stringify(reposData)}, accessToken: ${JSON.stringify(accessToken)} } }, '*');
           } catch (e) {}
             window.close();
           </script>

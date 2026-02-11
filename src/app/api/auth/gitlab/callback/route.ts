@@ -177,56 +177,30 @@ export async function GET(request: Request) {
     console.log('User:', userData.username);
     console.log('Connection ID:', connectionId);
 
-    // Success HTML with connection details and token storage
-    const successHtml = `<!DOCTYPE html>
-      <html>
-        <head>
-          <title>GitLab OAuth Success</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; }
-            .success { color: #10b981; font-size: 24px; font-weight: bold; }
-            .details { background: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px; }
-            code { background: #fff; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
-            button { background: #3b82f6; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-          </style>
-        </head>
-        <body>
-          <div class="success">✅ GitLab Connection Successful!</div>
-          <div class="details">
-            <p><strong>User:</strong> ${userData.username}</p>
-            <p><strong>Email:</strong> ${userData.email}</p>
-            <p><strong>Name:</strong> ${userData.name}</p>
-            <p><strong>User ID:</strong> <code>${userData.id}</code></p>
-            <p><strong>Connection ID:</strong> <code>${connectionId}</code></p>
-            <p><strong>Token Type:</strong> ${tokenData.token_type}</p>
-            <p><strong>Scope:</strong> <code>${tokenData.scope || 'read_user read_api read_repository'}</code></p>
-          </div>
-          <p style="color: #666; font-size: 14px;">You can now close this window and start using GitLab as a datasource.</p>
-          <button onclick="
-            // Store GitLab connection data in session storage
-            const connectionData = {
-              connectionId: '${connectionId}',
-              accessToken: '${tokenData.access_token}',
-              tokenType: '${tokenData.token_type}',
-              userId: ${userData.id},
-              username: '${userData.username}',
-              email: '${userData.email}',
-              name: '${userData.name}',
-              avatar: '${userData.avatar_url || ''}',
-              connectedAt: new Date().toISOString()
-            };
-            sessionStorage.setItem('gitlabConnection', JSON.stringify(connectionData));
-            localStorage.setItem('gitlabConnection_' + ${userData.id}, JSON.stringify(connectionData));
-            console.log('✅ GitLab connection stored:', connectionData);
+    // Return HTML with postMessage to send data back to opener (like GitHub)
+    return new Response(
+      `<!DOCTYPE html>
+      <html><body>
+          <script>
+          try {
+            // Format repos data like GitHub format for consistency
+            const projects = []; // GitLab projects aren't fetched yet, but we can add this later
+            window.opener && window.opener.postMessage({ 
+              type: 'gitlab-auth-success', 
+              data: { 
+                user: ${JSON.stringify(userData)},
+                repos: ${JSON.stringify([])},
+                accessToken: ${JSON.stringify(tokenData.access_token)}
+              } 
+            }, '*');
+          } catch (e) {
+            console.error('postMessage error:', e);
+          }
             window.close();
-          ">Store & Close Window</button>
-        </body>
-      </html>`;
-
-    return new Response(successHtml, {
-      headers: { 'Content-Type': 'text/html' },
-      status: 200,
-    });
+          </script>
+      </body></html>`,
+      { headers: { 'Content-Type': 'text/html' } }
+    );
   } catch (error) {
     console.error('❌ GitLab OAuth Error:', error);
     

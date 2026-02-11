@@ -7,6 +7,7 @@ import { User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth
 import { auth, db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, addDoc } from 'firebase/firestore';
 import { getDatasets } from '@/lib/datasetService';
+import { getActivity, saveActivity, getDataSources } from '@/lib/oauthService';
 import { getApiKeyEmail, getRejectionEmail } from '@/lib/emailService';
 import { DashboardHeader } from './DashboardHeader';
 import { DashboardSidebar } from './DashboardSidebar';
@@ -140,8 +141,8 @@ const EnhancedDashboard: React.FC = () => {
           await requestDeduplicator.execute(
             `user_data_${userId}`,
             async () => {
-              // Fetch both datasets and access requests in parallel
-              const [firestoreDatasets, accessRequestsData] = await Promise.all([
+              // Fetch datasets, access requests, data sources, and activity in parallel
+              const [firestoreDatasets, accessRequestsData, dataSources, recentActivities] = await Promise.all([
                 // Fetch datasets
                 (async () => {
                   try {
@@ -200,12 +201,42 @@ const EnhancedDashboard: React.FC = () => {
                     console.error('❌ Error fetching access requests:', error);
                     return [];
                   }
+                })(),
+                // Fetch data sources (connected sources)
+                (async () => {
+                  try {
+                    console.log('🔗 Fetching data sources for user:', userId);
+                    const sources = await getDataSources(userId);
+                    if (sources.length > 0) {
+                      console.log('✅ Loaded', sources.length, 'data sources from Firestore');
+                    }
+                    return sources;
+                  } catch (error) {
+                    console.error('❌ Error fetching data sources:', error);
+                    return [];
+                  }
+                })(),
+                // Fetch recent activity
+                (async () => {
+                  try {
+                    console.log('📋 Fetching recent activity for user:', userId);
+                    const activities = await getActivity(userId);
+                    if (activities.length > 0) {
+                      console.log('✅ Loaded', activities.length, 'activities from Firestore');
+                    }
+                    return activities;
+                  } catch (error) {
+                    console.error('❌ Error fetching activities:', error);
+                    return [];
+                  }
                 })()
               ]);
 
-              // Update state with both datasets and access requests
+              // Update state with all fetched data
               updateState('datasets', firestoreDatasets);
               updateState('accessRequests', accessRequestsData);
+              updateState('dataSources', dataSources);
+              updateState('recentActivity', recentActivities);
             }
           );
         } catch (error) {
@@ -254,7 +285,7 @@ const EnhancedDashboard: React.FC = () => {
     }
   };
 
-  const handleAddActivity = (action: string, type: string, icon: string) => {
+  const handleAddActivity = async (action: string, type: string, icon: string) => {
     const newActivity: Activity = {
       action,
       time: 'Just now',
@@ -265,6 +296,15 @@ const EnhancedDashboard: React.FC = () => {
       ...prev,
       recentActivity: [newActivity, ...prev.recentActivity].slice(0, 10)
     }));
+    
+    // Save activity to Firestore for persistence
+    if (state.currentUser?.uid) {
+      try {
+        await saveActivity(state.currentUser.uid, action, type, icon);
+      } catch (error) {
+        console.error('Error saving activity to Firestore:', error);
+      }
+    }
   };
 
   // ============ RENDER ============
@@ -390,7 +430,19 @@ const EnhancedDashboard: React.FC = () => {
         onClose={() => updateState('showAddSourceModal', false)}
         currentUser={state.currentUser}
         onDatasetAdded={(sourceType: SourceType, licenseType: LicenseType, file?: File, sourceProvider?: string) => {
-          if (file && state.currentUser) {
+          // Handle repository imports from GitHub/GitLab/Bitbucket
+          if (sourceProvider && !file) {
+            // This is a repository import
+            const providerIcons: Record<string, string> = {
+              'github': '🔗',
+              'gitlab': '🦊',
+              'bitbucket': '📦'
+            };
+            const icon = providerIcons[sourceProvider] || '📚';
+            handleAddActivity(`Imported repositories from ${sourceProvider}`, 'repository', icon);
+          }
+          // Handle file uploads
+          else if (file && state.currentUser) {
             // Create a new dataset from the uploaded file
             const newDataset: Dataset = {
               id: `ds-${Date.now()}`,

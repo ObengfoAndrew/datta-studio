@@ -30,6 +30,7 @@ const RepositoryConnector: React.FC<RepositoryConnectorProps> = ({
 }) => {
   const [repositories, setRepositories] = useState<any[]>([]);
   const [userData, setUserData] = useState<any>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedRepos, setSelectedRepos] = useState<any[]>([]);
   const [connecting, setConnecting] = useState(false);
@@ -64,10 +65,11 @@ const RepositoryConnector: React.FC<RepositoryConnectorProps> = ({
       if (event.origin !== window.location.origin) return;
 
       if (event.data.type === 'github-auth-success' || event.data.type === 'gitlab-auth-success') {
-        const { user, repos } = event.data.data;
+        const { user, repos, accessToken: token } = event.data.data;
         console.log('✅ OAuth Success:', { provider, user: user?.login || user?.username, repoCount: repos?.length });
         
         setUserData(user);
+        setAccessToken(token);
         setRepositories(repos || []);
         setShowRepositories(true);
         setError(null);
@@ -160,6 +162,7 @@ const RepositoryConnector: React.FC<RepositoryConnectorProps> = ({
     setShowRepositories(false);
     setRepositories([]);
     setUserData(null);
+    setAccessToken(null);
     setSelectedRepos([]);
     setError(null);
   };
@@ -176,6 +179,18 @@ const RepositoryConnector: React.FC<RepositoryConnectorProps> = ({
     try {
       let successCount = 0;
       
+      // First, save the connected OAuth source (one time)
+      if (userData && accessToken) {
+        try {
+          await saveConnectedSource(userId, provider, userData, accessToken);
+          console.log('✅ Connected source saved:', provider);
+        } catch (sourceError) {
+          console.error('⚠️ Failed to save connected source:', sourceError);
+          // Continue anyway - datasets are more important
+        }
+      }
+      
+      // Then, import each repository as a dataset
       for (const repo of selectedRepos) {
         try {
           const dataset = await saveDatasetToFirestore(userId, provider, repo, licenseType);
@@ -204,6 +219,7 @@ const RepositoryConnector: React.FC<RepositoryConnectorProps> = ({
       setSelectedRepos([]);
       setRepositories([]);
       setShowRepositories(false);
+      setAccessToken(null);
     } catch (err: any) {
       const errorMsg = err.message || 'Failed to import repositories';
       setError(errorMsg);
