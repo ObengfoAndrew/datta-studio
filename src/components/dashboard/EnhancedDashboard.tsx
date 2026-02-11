@@ -464,13 +464,15 @@ const EnhancedDashboard: React.FC = () => {
             const updatedDatasets = [...state.datasets, newDataset];
             updateState('datasets', updatedDatasets);
 
-            // Create folder name from file (remove extension and sanitize)
-            const folderName = file.name.replace(/\.[^/.]+$/, '');
+            // Create folder name from file with "Upload" prefix
+            const fileName = file.name.replace(/\.[^/.]+$/, '');
+            const uploadDate = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+            const folderName = `Upload - ${uploadDate} - ${fileName}`;
             const sanitizedFolderName = folderName
               .toLowerCase()
-              .replace(/[^a-z0-9\s]/g, '')
+              .replace(/[^a-z0-9\s\-]/g, '')
               .replace(/\s+/g, '_')
-              .substring(0, 50);
+              .substring(0, 80);
 
             // Persist dataset to Firestore and create wallet folder
             (async () => {
