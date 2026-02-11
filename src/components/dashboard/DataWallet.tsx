@@ -108,9 +108,7 @@ export const DataWallet: React.FC<DataWalletProps> = ({
             if (!walletSnapshot.empty) {
               walletSnapshot.forEach((folderDoc) => {
                 const folderData = folderDoc.data();
-                const folderName = folderData.sanitizedFolderName || folderDoc.id;
-
-                firebaseFolders.push({
+              const folderName = folderData.folderName || folderData.sanitizedFolderName || folderDoc.id;
                   name: folderName,
                   fileCount: folderData.fileCount || 0,
                   totalSize: folderData.totalSize || 0,

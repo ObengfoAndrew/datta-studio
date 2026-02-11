@@ -465,16 +465,10 @@ const EnhancedDashboard: React.FC = () => {
             updateState('datasets', updatedDatasets);
 
             // Create folder name from file with "Upload" prefix
-            const fileName = file.name.replace(/\.[^/.]+$/, '');
-            const uploadDate = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-            const folderName = `Upload - ${uploadDate} - ${fileName}`;
-            const sanitizedFolderName = folderName
-              .toLowerCase()
-              .replace(/[^a-z0-9\s\-]/g, '')
-              .replace(/\s+/g, '_')
-              .substring(0, 80);
+            const uploadedFilesFolderName = 'Uploaded Files';
+            const sanitizedFolderName = 'uploaded_files';
 
-            // Persist dataset to Firestore and create wallet folder
+            // Persist dataset to Firestore and add to existing wallet folder
             (async () => {
               try {
                 if (!db) {
@@ -499,27 +493,56 @@ const EnhancedDashboard: React.FC = () => {
                 });
                 console.log('✅ Dataset saved to Firestore');
 
-                // Create folder in Data Wallet and save file structure
+                // Add file to "Uploaded Files" folder in Data Wallet
                 const walletRef = collection(userDocRef, 'wallet');
                 const folderDocRef = doc(walletRef, sanitizedFolderName);
                 
-                await setDoc(folderDocRef, {
-                  folderName: folderName,
-                  sanitizedFolderName: sanitizedFolderName,
-                  fileCount: 1,
-                  totalSize: file.size,
-                  files: [{
+                // Get existing folder data
+                const walletSnapshot = await getDocs(walletRef);
+                const existingFolder = walletSnapshot.docs.find(d => d.id === sanitizedFolderName);
+                
+                if (existingFolder) {
+                  // Folder exists, append file to it
+                  const folderData = existingFolder.data();
+                  const existingFiles = folderData.files || [];
+                  const updatedFiles = [...existingFiles, {
                     name: file.name,
                     size: file.size,
                     type: file.type || 'application/octet-stream',
                     uploadDate: new Date().toISOString()
-                  }],
-                  sourceType: sourceType,
-                  licenseType: licenseType,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                }, { merge: true });
-                console.log(`✅ Data Wallet folder created: ${sanitizedFolderName}`);
+                  }];
+                  
+                  await setDoc(folderDocRef, {
+                    folderName: uploadedFilesFolderName,
+                    sanitizedFolderName: sanitizedFolderName,
+                    fileCount: updatedFiles.length,
+                    totalSize: updatedFiles.reduce((sum: number, f: any) => sum + f.size, 0),
+                    files: updatedFiles,
+                    sourceType: sourceType,
+                    licenseType: licenseType,
+                    updatedAt: new Date().toISOString()
+                  }, { merge: true });
+                  console.log(`✅ File added to Data Wallet folder: ${uploadedFilesFolderName}`);
+                } else {
+                  // Folder doesn't exist, create it with the file
+                  await setDoc(folderDocRef, {
+                    folderName: uploadedFilesFolderName,
+                    sanitizedFolderName: sanitizedFolderName,
+                    fileCount: 1,
+                    totalSize: file.size,
+                    files: [{
+                      name: file.name,
+                      size: file.size,
+                      type: file.type || 'application/octet-stream',
+                      uploadDate: new Date().toISOString()
+                    }],
+                    sourceType: sourceType,
+                    licenseType: licenseType,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                  });
+                  console.log(`✅ Data Wallet folder created: ${uploadedFilesFolderName}`);
+                }
               } catch (error) {
                 console.error('❌ Error saving to Firestore:', error);
               }
@@ -536,14 +559,14 @@ const EnhancedDashboard: React.FC = () => {
             const updatedDataSources = [...state.dataSources, newDataSource];
             updateState('dataSources', updatedDataSources);
 
-            // Add to uploaded files with the dataset-specific folder
+            // Add to uploaded files with the consolidated folder
             const newUploadedFile = {
               id: `file-${Date.now()}`,
               name: file.name,
               type: file.type || 'application/octet-stream',
               size: file.size,
               uploadDate: new Date().toISOString(),
-              folder: sanitizedFolderName // Use the dataset folder instead of "Uploaded Files"
+              folder: uploadedFilesFolderName // Use "Uploaded Files" as the folder name
             } as any;
             const updatedFiles = [...state.uploadedFiles, newUploadedFile];
             updateState('uploadedFiles', updatedFiles);
