@@ -67,6 +67,8 @@ export const DataWallet: React.FC<DataWalletProps> = ({
   const [files, setFiles] = useState<WalletFile[]>([]);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [showFileDetailsModal, setShowFileDetailsModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<WalletFile | null>(null);
 
   // Fetch wallet data from Firestore and local state
   useEffect(() => {
@@ -385,8 +387,9 @@ export const DataWallet: React.FC<DataWalletProps> = ({
                     <h4 style={{ fontSize: '14px', fontWeight: '600', color: theme.text, margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</h4>
                     <div style={{ fontSize: '12px', color: theme.textSecondary, marginBottom: '12px' }}>{formatFileSize(file.size)}</div>
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      {file.downloadURL && <button onClick={() => window.open(file.downloadURL)} style={{ flex: 1, padding: '6px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}><Eye style={{ width: '14px', height: '14px', margin: '0 auto' }} /></button>}
-                      <button onClick={() => handleFileDelete(file)} style={{ flex: 1, padding: '6px', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}><Trash2 style={{ width: '14px', height: '14px', margin: '0 auto' }} /></button>
+                      <button onClick={() => { setSelectedFile(file); setShowFileDetailsModal(true); }} style={{ flex: 1, padding: '6px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="View details"><Eye style={{ width: '14px', height: '14px', margin: '0 auto' }} /></button>
+                      {file.downloadURL && <button onClick={() => window.open(file.downloadURL)} style={{ flex: 1, padding: '6px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="Download"><Download style={{ width: '14px', height: '14px', margin: '0 auto' }} /></button>}
+                      <button onClick={() => handleFileDelete(file)} style={{ flex: 1, padding: '6px', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="Delete"><Trash2 style={{ width: '14px', height: '14px', margin: '0 auto' }} /></button>
                     </div>
                   </div>
                 );
@@ -410,6 +413,53 @@ export const DataWallet: React.FC<DataWalletProps> = ({
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                 <button onClick={() => { setShowCreateFolderModal(false); setNewFolderName(''); }} style={{ padding: '8px 16px', backgroundColor: theme.border, color: theme.text, border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>
                 <button onClick={handleCreateFolder} style={{ padding: '8px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Create</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* File Details Modal */}
+        {showFileDetailsModal && selectedFile && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+            <div style={{ backgroundColor: theme.cardBg, borderRadius: '12px', padding: '24px', width: '90%', maxWidth: '500px', boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: theme.text }}>File Details</h2>
+                <button onClick={() => { setShowFileDetailsModal(false); setSelectedFile(null); }} style={{ background: 'none', border: 'none', color: theme.textSecondary, fontSize: '24px', cursor: 'pointer' }}><X style={{ width: '20px', height: '20px' }} /></button>
+              </div>
+              
+              <div style={{ backgroundColor: theme.searchBg, borderRadius: '12px', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '64px', height: '64px', backgroundColor: '#f59e0b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                  {React.createElement(getFileIcon(selectedFile.type), { style: { width: '32px', height: '32px' } })}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', color: theme.text, margin: '0 0 8px 0', wordBreak: 'break-word' }}>{selectedFile.name}</h3>
+                  <p style={{ color: theme.textSecondary, fontSize: '13px', margin: 0 }}>{selectedFile.type}</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ padding: '12px', backgroundColor: theme.searchBg, borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: theme.textSecondary, marginBottom: '4px' }}>File Size</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: theme.text }}>{formatFileSize(selectedFile.size)}</div>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: theme.searchBg, borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: theme.textSecondary, marginBottom: '4px' }}>Upload Date</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: theme.text }}>{formatDate(selectedFile.uploadDate)}</div>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: theme.searchBg, borderRadius: '8px', gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: '12px', color: theme.textSecondary, marginBottom: '4px' }}>Storage Folder</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: theme.text, wordBreak: 'break-word' }}>{selectedFile.folder}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {selectedFile.downloadURL && (
+                  <button onClick={() => { window.open(selectedFile.downloadURL); }} style={{ flex: 1, padding: '10px 16px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <Download style={{ width: '16px', height: '16px' }} />
+                    Download
+                  </button>
+                )}
+                <button onClick={() => { setShowFileDetailsModal(false); setSelectedFile(null); }} style={{ flex: 1, padding: '10px 16px', backgroundColor: theme.border, color: theme.text, border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>Close</button>
               </div>
             </div>
           </div>
