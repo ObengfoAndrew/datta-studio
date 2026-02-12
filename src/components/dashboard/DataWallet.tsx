@@ -138,8 +138,8 @@ export const DataWallet: React.FC<DataWalletProps> = ({
           }
         }
 
-        const allFolders = [...localFoldersData, ...firebaseFolders];
-        const allFiles = [...localFiles, ...firebaseFiles];
+        const allFolders = firebaseFolders.length > 0 ? firebaseFolders : localFoldersData;
+        const allFiles = firebaseFiles.length > 0 ? firebaseFiles : localFiles;
 
         console.log('✅ Final data:', { folders: allFolders.length, files: allFiles.length });
         setFolders(allFolders);
