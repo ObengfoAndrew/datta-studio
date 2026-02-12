@@ -77,8 +77,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '8px',
-              transition: 'all 0.2s ease',
-              hover: { backgroundColor: theme.border }
+              transition: 'all 0.2s ease'
             }}
             title="Toggle menu"
             onMouseEnter={(e) => {
