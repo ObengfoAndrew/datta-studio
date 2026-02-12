@@ -218,9 +218,21 @@ export const DataWallet: React.FC<DataWalletProps> = ({
     try {
       const userDocRef = doc(ensureDb(), 'users', userId);
       const walletRef = collection(userDocRef, 'wallet');
-      const folderDocRef = doc(walletRef, folderName);
       const folderDocs = await getDocs(walletRef);
-      const targetFolder = folderDocs.docs.find(d => d.id === folderName)?.data();
+      
+      // Find the folder document by matching the display folder name
+      const folderDocSnapshot = folderDocs.docs.find(d => {
+        const data = d.data();
+        return data.folderName === folderName || d.id === folderName;
+      });
+
+      if (!folderDocSnapshot) {
+        alert('❌ Folder not found');
+        return;
+      }
+
+      const targetFolder = folderDocSnapshot.data();
+      const folderDocId = folderDocSnapshot.id;
 
       if (targetFolder?.files) {
         for (const file of targetFolder.files) {
@@ -234,7 +246,8 @@ export const DataWallet: React.FC<DataWalletProps> = ({
         }
       }
 
-      await deleteDoc(folderDocRef);
+      // Delete the folder document using the correct ID
+      await deleteDoc(doc(walletRef, folderDocId));
       setFolders(prev => prev.filter(f => f.name !== folderName));
       setFiles(prev => prev.filter(f => f.folder !== folderName));
       alert(`✅ Folder deleted!`);
@@ -264,16 +277,23 @@ export const DataWallet: React.FC<DataWalletProps> = ({
       const userDocRef = doc(ensureDb(), 'users', userId);
       const walletRef = collection(userDocRef, 'wallet');
       const folderDocs = await getDocs(walletRef);
-      const folderDoc = folderDocs.docs.find((d: any) => d.id === file.folder);
+      
+      // Find folder by display name
+      const folderDoc = folderDocs.docs.find((d: any) => {
+        const data = d.data();
+        return data.folderName === file.folder || d.id === file.folder;
+      });
 
       if (folderDoc) {
         const folderData = folderDoc.data();
+        const folderDocId = folderDoc.id;
+        
         if (folderData.files) {
           const updated = folderData.files.filter((f: any) => f.name !== file.name);
           if (updated.length === 0) {
-            await deleteDoc(doc(walletRef, file.folder));
+            await deleteDoc(doc(walletRef, folderDocId));
           } else {
-            await setDoc(doc(walletRef, file.folder), {
+            await setDoc(doc(walletRef, folderDocId), {
               ...folderData,
               files: updated,
               fileCount: updated.length,
